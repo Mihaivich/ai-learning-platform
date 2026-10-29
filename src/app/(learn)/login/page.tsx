@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { glass } from "@/components/home/glass";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { safeSignInReturn } from "@/lib/auth-redirect";
+
+function callbackUrl() {
+  const next = safeSignInReturn(new URLSearchParams(window.location.search).get("next"));
+  return `${window.location.origin}/auth/callback?${new URLSearchParams({ next })}`;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,7 +21,7 @@ export default function LoginPage() {
     setStatus("sending");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl() },
     });
     // On success the browser is already navigating to GitHub.
     if (error) {
@@ -31,7 +37,7 @@ export default function LoginPage() {
     setStatus("sending");
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: callbackUrl() },
     });
     if (error) {
       setError(error.message);
@@ -45,7 +51,7 @@ export default function LoginPage() {
     <div className="mx-auto max-w-md px-4 py-16 sm:py-24">
       <div className={`${glass} p-7 shadow-2xl sm:p-8`}>
       <h1 className="text-3xl font-bold">Sign in</h1>
-      <p className="mt-2 text-white/60">Your project runs are saved to your account.</p>
+      <p className="mt-2 text-white/60">Your courses, progress and project runs are saved to your account.</p>
       {!isSupabaseConfigured ? (
         <p className="mt-4 text-white/70">
           Accounts aren&apos;t enabled on this deployment yet.

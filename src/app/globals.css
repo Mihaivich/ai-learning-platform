@@ -1,8 +1,9 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
-  --background: #000000;
-  --foreground: #fafafa;
+  --background: #fafaf9;
+  --foreground: #1c1917;
 }
 
 @theme inline {
@@ -15,6 +16,11 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.prose table {
+  display: block;
+  overflow-x: auto;
 }
 
 /*

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-store";
+import { useLearner } from "@/lib/learner-store";
+import { lessonHref, projectHref, type ProjectCourseContext } from "@/lib/learning/project-links";
 import { play, readSoundSetting, unlockSound, writeSoundSetting } from "@/lib/sound";
 import type { ProjectView } from "@/lib/projects/runtime";
 import { APPS, DOCK, STAGE_APP, nextStep, type AppId, type Op } from "./config";
@@ -42,13 +44,19 @@ export function Desktop({
   scenarioId,
   title,
   summary,
+  courseContext,
 }: {
   scenarioId: string;
   title: string;
   summary: string;
   client: { name: string; role: string; organisation: string };
+  courseContext?: ProjectCourseContext;
 }) {
   const { ready, user } = useAuth();
+  const { recordBlock } = useLearner();
+  const exitHref = courseContext ? lessonHref(courseContext) : "/projects";
+  const [courseSave, setCourseSave] = useState("");
+  const [courseSaveError, setCourseSaveError] = useState(false);
   const [view, setView] = useState<ProjectView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,6 +78,29 @@ export function Desktop({
   const stageApp = useRef<AppId | null>(null);
   const lastDelivery = useRef(0);
   const windowsNow = useRef(windows);
+
+  const syncCourse = useCallback(async () => {
+    if (!courseContext) return;
+    setCourseSave("Saving course progress…");
+    setCourseSaveError(false);
+    try {
+      const res = await fetch("/api/activities", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...courseContext, action: "submit" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save course progress.");
+      recordBlock(courseContext.courseId, courseContext.lessonId, courseContext.activityId, { done: true });
+      setCourseSave(data.saved ? "Course progress saved" : "Practice complete — return to your lesson");
+    } catch (cause) {
+      setCourseSave((cause as Error).message);
+      setCourseSaveError(true);
+    }
+  }, [courseContext, recordBlock]);
+
+  useEffect(() => {
+    if (view?.status === "completed") void syncCourse();
+  }, [view?.status, syncCourse]);
 
   useEffect(() => {
     windowsNow.current = windows;
@@ -221,7 +252,7 @@ export function Desktop({
             <>
               <p className="mt-3 text-[14px] text-stone-700">{summary}</p>
               <p className="mt-3 text-[14px] text-stone-600">Sign in to start. Your decisions are saved so you can come back.</p>
-              <Link href="/login" className="mt-5 inline-block rounded-md bg-blue-600 px-4 py-2 text-[14px] font-medium text-white">Sign in to start</Link>
+              <Link href={`/login?${new URLSearchParams({ next: projectHref(scenarioId, courseContext) })}`} className="mt-5 inline-block rounded-md bg-blue-600 px-4 py-2 text-[14px] font-medium text-white">Sign in to start</Link>
             </>
           ) : error ? (
             <>
@@ -231,7 +262,7 @@ export function Desktop({
           ) : (
             <p className="mt-3 text-[14px] text-stone-600">Opening your desktop…</p>
           )}
-          <Link href="/" className="mt-4 block text-[13px] text-stone-500 underline">Back to DevPath</Link>
+          <Link href={exitHref} className="mt-4 block text-[13px] text-stone-500 underline">{courseContext ? "Return to lesson" : "Back to DevPath"}</Link>
         </div>
       </div>
     );
@@ -270,7 +301,10 @@ export function Desktop({
     <div className="relative h-full overflow-hidden font-sans text-stone-900" style={WALLPAPER}>
       {/* Menu bar */}
       <header className="absolute inset-x-0 top-0 z-[960] flex h-7 items-center gap-4 bg-white/40 px-3 text-[13px] text-stone-900 backdrop-blur-xl">
-        <Link href="/" aria-label="Leave the desktop and return to DevPath" className="font-bold tracking-tight">◆</Link>
+        <Link href={exitHref} aria-label={courseContext ? "Return to lesson" : "Leave the desktop and return to DevPath"} className="font-bold tracking-tight">◆</Link>
+        {courseContext && <Link href={exitHref} className="text-xs font-medium">Return to lesson</Link>}
+        {courseSave && <span role="status" className="text-xs">{courseSave}</span>}
+        {courseSaveError && <button className="text-xs underline" onClick={() => void syncCourse()}>Retry saving progress</button>}
         <span className="font-semibold">{focused ? APPS[focused].name : "Finder"}</span>
         {step && needed ? (
           <button
@@ -389,7 +423,7 @@ export function Desktop({
         <Report
           view={view}
           busy={busy}
-          exitHref="/"
+          exitHref={exitHref}
           onClose={() => setReportOpen(false)}
           onRestart={async () => {
             if (await send({ op: "restart" })) {

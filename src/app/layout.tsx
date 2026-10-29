@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AuthProvider } from "@/lib/auth-store";
+import { LearnerProvider } from "@/lib/learner-store";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DevPath · Lead a software project with AI on your team",
-  description: "Immersive project simulations where you work with an AI client and an AI coding agent.",
+  title: "DevPath · Interactive learning in any subject",
+  description: "Teacher-designed, AI-supported courses and immersive learning activities across subjects.",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
+        <LearnerProvider>{children}</LearnerProvider>
       </body>
     </html>
   );

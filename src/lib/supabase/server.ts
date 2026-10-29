@@ -27,7 +27,7 @@ export async function requireAccount(teacher = false) {
   if (!db)
     throw new HttpError(
       503,
-      "Configure Supabase to save project runs.",
+      "Configure Supabase to save courses, learning records and project runs.",
     );
   const { data, error } = await db.auth.getUser();
   if (error || !data.user) throw new HttpError(401, "Sign in to continue.");

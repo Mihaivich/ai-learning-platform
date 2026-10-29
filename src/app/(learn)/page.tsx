@@ -3,182 +3,113 @@ import { Reveal } from "@/components/home/Reveal";
 import { SpotlightCard } from "@/components/home/SpotlightCard";
 import { TourLink } from "@/components/home/TourLink";
 import { glass } from "@/components/home/glass";
-import { AppIcon, Avatar } from "@/components/projects/desktop/icons";
-import { APPS, DOCK, type AppId } from "@/components/projects/desktop/config";
+import { featuredCourses } from "@/lib/learning/featured";
+import { listCourses } from "@/lib/learning/repository";
+import { serverDb } from "@/lib/supabase/server";
+import type { Course } from "@/lib/types";
 
-// Platform copy only. Anything about a particular scenario belongs in its listing.
-const DESK: Record<AppId, string> = {
-  mail: "Read the brief: the client's request, a ticket from the people who'll use the system and a note from your manager.",
-  call: "Interview the client. They know what's really wrong, but they only answer what you ask.",
-  notes: "Write the requirements, including how everyone will know the work succeeded.",
-  cody: "Brief the AI coding agent. It builds exactly what you describe, gaps and all.",
-  review: "Check what comes back. Approve it, or send it back with a clear reason.",
-  launch: "Choose how to release it, then see how it plays out.",
-};
+export const dynamic = "force-dynamic";
 
-// The client and Cody respond to what the learner writes, so they are played by
-// AI. The manager and the users react to decisions, which the script handles.
-const TEAM = [
-  { name: "The client", note: "Answers your questions on a live call. Knows the business but not the technology, and only tells you what you ask.", ai: true },
-  { name: "Cody", note: "An AI coding agent that works from your brief exactly as written: fast, confident and literal.", ai: true },
-  { name: "Your manager", note: "Sets the budget and the deadline, and gets in touch when either starts to slip.", ai: false },
-  { name: "The users", note: "Live with whatever you ship, and are the first to notice what you missed.", ai: false },
+const CAPABILITIES = [
+  {
+    title: "Guided Learning",
+    text: "Structured lessons, activities and AI-assisted explanations that adapt to how you learn.",
+  },
+  {
+    title: "AI Course Builder",
+    text: "Generate and customise mini-courses for academic, professional or personal subjects.",
+  },
+  {
+    title: "Interactive Practice",
+    text: "Quizzes, conversations, decision simulations and immersive project experiences.",
+  },
 ] as const;
 
-const TEAM_AVATAR: Record<string, { initials: string; tone: string }> = {
-  "The client": { initials: "C", tone: "from-rose-400 to-orange-400" },
-  "Your manager": { initials: "M", tone: "from-sky-400 to-indigo-500" },
-  "The users": { initials: "U", tone: "from-emerald-400 to-teal-500" },
-};
-
-const FLUENCY = [
-  { title: "Delegation", text: "What you handed to AI, and what you kept for yourself.", rating: "strong" },
-  { title: "Description", text: "How clearly you described what you needed.", rating: "mixed" },
-  { title: "Discernment", text: "Whether you spotted what it got wrong.", rating: "strong" },
-  { title: "Diligence", text: "Whether you took responsibility for what shipped.", rating: "weak" },
+const EDUCATOR = [
+  {
+    title: "Create with AI",
+    text: "Draft a course outline, lessons and activities, then review before students see them.",
+  },
+  {
+    title: "Customise every activity",
+    text: "Edit readings, quizzes, simulations and immersive projects in one Course Studio.",
+  },
+  {
+    title: "Invite and monitor",
+    text: "Invite students by email and follow participation, submissions and feedback.",
+  },
 ] as const;
 
-const RATING = {
-  strong: "bg-emerald-400/15 text-emerald-300 ring-emerald-400/30",
-  mixed: "bg-amber-400/15 text-amber-300 ring-amber-400/30",
-  weak: "bg-rose-400/15 text-rose-300 ring-rose-400/30",
-};
-
-const ENDINGS = [
-  { label: "Success", tone: "text-emerald-300", text: "The client's problem is solved, and you can prove it." },
-  { label: "Partly there", tone: "text-amber-300", text: "It mostly works, but something slipped through and cost time." },
-  { label: "It went wrong", tone: "text-rose-300", text: "A gap in your brief reached real users." },
-];
-
-const PRINCIPLES = [
-  { title: "Scripted, so it's fair", text: "Every project follows a written story with real branches. It never drifts, and every learner faces the same situation." },
-  { title: "AI where your words matter", text: "AI reads your questions, requirements and brief: the moments where how you put something changes what happens." },
-  { title: "Consequences, not quizzes", text: "There are no right-answer buttons. What you miss or wave through shows up later, in the code, the release and the report." },
-];
-
-// A shared minimum width keeps the hero buttons the same size, whichever label is longer.
-const pill = "inline-flex min-w-52 items-center justify-center rounded-full px-7 py-3 text-[15px] font-medium transition duration-300";
+const pill =
+  "inline-flex min-w-48 items-center justify-center rounded-full px-7 py-3 text-[15px] font-medium transition duration-300";
 const primary = `${pill} bg-white text-black hover:bg-white/85`;
-// Frosted like the navbar, so it reads as glass over the light bands.
 const secondary = `${pill} border border-white/20 bg-white/[0.06] text-white/80 backdrop-blur-xl backdrop-saturate-150 hover:scale-[1.02] hover:border-white/50 hover:bg-white/15 hover:text-white hover:shadow-[0_0_20px_rgba(255,255,255,0.3),0_0_40px_rgba(255,255,255,0.1)]`;
-
-// Every section shares the navbar's width, so their edges line up on wide screens.
 const column = "mx-auto w-full max-w-4xl px-4 lg:px-0";
 
-export default function Home() {
+async function hasSession() {
+  const db = await serverDb();
+  if (!db) return false;
+  const { data } = await db.auth.getUser();
+  return !!data.user;
+}
+
+function authAware(href: string, signedIn: boolean) {
+  if (signedIn) return href;
+  return `/login?next=${encodeURIComponent(href)}`;
+}
+
+export default async function Home() {
+  const [courses, signedIn] = await Promise.all([listCourses(), hasSession()]);
+  const featured = featuredCourses(courses);
+
   return (
     <div className="relative text-white">
-      {/* Hero */}
-      <section className={`${column} flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center py-16 text-center lg:min-h-[calc(100dvh-7rem)]`}>
-        <Reveal delay={100}>
-          <h1 className="text-balance text-5xl font-bold leading-[1.05] tracking-tight drop-shadow-lg sm:text-7xl">
-            Lead a software project{" "}
-            <span className="bg-gradient-to-r from-cyan-300 via-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">with AI on your team.</span>
-          </h1>
-        </Reveal>
-        <Reveal delay={200}>
-          <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-white/75 sm:text-xl">
-            Step into a simulated workday. Interview a client, brief an AI coding agent, review what it builds and decide when to ship. Every choice changes how the project ends.
+      <section
+        className={`${column} flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center py-16 text-center lg:min-h-[calc(100dvh-7rem)]`}
+      >
+        <Reveal>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/80">
+            DevPath · AI-Powered Interactive Learning
           </p>
         </Reveal>
-        <Reveal delay={300}>
+        <Reveal delay={80}>
+          <h1 className="mt-4 text-balance text-5xl font-bold leading-[1.05] tracking-tight drop-shadow-lg sm:text-7xl">
+            Learn anything.{" "}
+            <span className="bg-gradient-to-r from-cyan-300 via-indigo-300 to-fuchsia-300 bg-clip-text text-transparent">
+              By doing.
+            </span>
+          </h1>
+        </Reveal>
+        <Reveal delay={160}>
+          <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-white/75 sm:text-xl">
+            Explore interactive courses, create your own learning path with AI, and
+            practise through realistic simulations.
+          </p>
+        </Reveal>
+        <Reveal delay={240}>
           <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <Link href="/projects" className={primary}>
-              Browse projects
+            <Link href="/courses" className={primary}>
+              Explore Courses
             </Link>
-            <TourLink className={secondary}>Watch the 30s tour</TourLink>
+            <Link href={authAware("/my-courses", signedIn)} className={secondary}>
+              Create with AI
+            </Link>
           </div>
         </Reveal>
       </section>
 
-      {/* Product tour video. Click to play: the soundtrack is part of it, and nothing loads until then. */}
-      <section id="tour" className={`${column} scroll-mt-32 py-20`}>
-        <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-300/80">See it in action</p>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">A workday in 30 seconds.</h2>
-          <p className="mt-4 max-w-2xl text-lg text-white/65">Follow one project from the client&apos;s first email to the final report.</p>
-        </Reveal>
-        <Reveal delay={150} className={`mt-12 ${glass} overflow-hidden p-2 shadow-2xl sm:p-3`}>
-          <video
-            id="tour-player"
-            controls
-            playsInline
-            preload="none"
-            poster="/promo/devpath-tour-poster.jpg"
-            className="aspect-video w-full rounded-2xl bg-black"
-            aria-label="DevPath product tour: one project on the simulated desktop, from the client's email to the project report"
-          >
-            <source src="/promo/devpath-tour-1080.mp4" type="video/mp4" media="(min-width: 1280px)" />
-            <source src="/promo/devpath-tour-720.mp4" type="video/mp4" />
-          </video>
-        </Reveal>
-      </section>
-
-      {/* How a project works */}
-      <section id="how" className={`${column} scroll-mt-32 py-20`}>
-        <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/80">How it works</p>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">One desktop, six tools.</h2>
-          <p className="mt-4 max-w-2xl text-lg text-white/65">Each project brings a new client and a new problem. The tools, and the habits they build, stay the same.</p>
-        </Reveal>
-        <ol className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {DOCK.map((app, index) => (
-            <li key={app}>
-              <SpotlightCard delay={(index % 3) * 100} className="h-full p-7">
-                <div className="flex items-center justify-between">
-                  <AppIcon app={app} size={52} />
-                  <span className="font-mono text-sm text-white/35">0{index + 1}</span>
-                </div>
-                <h3 className="mt-5 text-xl font-semibold">{APPS[app].name}</h3>
-                <p className="mt-2 leading-relaxed text-white/65">{DESK[app]}</p>
-              </SpotlightCard>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* Who you work with */}
       <section className={`${column} py-20`}>
         <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-fuchsia-300/80">Who you work with</p>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">AI plays the people you talk to.</h2>
-          <p className="mt-4 max-w-2xl text-lg text-white/65">
-            The client and Cody respond to what you actually write. Your manager and the users react to the decisions you make, following the project&apos;s script.
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-300/80">
+            Core capabilities
           </p>
-        </Reveal>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2">
-          {TEAM.map((person, index) => (
-            <SpotlightCard key={person.name} delay={(index % 2) * 100} className="h-full p-6">
-              <div className="flex items-center justify-between gap-3">
-                {person.name === "Cody" ? (
-                  <AppIcon app="cody" size={48} />
-                ) : (
-                  <Avatar initials={TEAM_AVATAR[person.name].initials} tone={TEAM_AVATAR[person.name].tone} size={48} />
-                )}
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
-                    person.ai ? "bg-blue-400/15 text-blue-200 ring-blue-400/30" : "bg-white/5 text-white/55 ring-white/15"
-                  }`}
-                >
-                  {person.ai ? "Played by AI" : "Scripted"}
-                </span>
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">{person.name}</h3>
-              <p className="mt-2 leading-relaxed text-white/70">{person.note}</p>
-            </SpotlightCard>
-          ))}
-        </div>
-      </section>
-
-      {/* How it's built */}
-      <section className={`${column} py-20`}>
-        <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-300/80">Why it works</p>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">Scripted, with AI where it counts.</h2>
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">
+            One platform for guided learning and practice.
+          </h2>
         </Reveal>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {PRINCIPLES.map((item, index) => (
-            <SpotlightCard key={item.title} delay={index * 100} className="h-full p-7">
+          {CAPABILITIES.map((item, index) => (
+            <SpotlightCard key={item.title} delay={index * 80} className="h-full p-7">
               <h3 className="text-xl font-semibold">{item.title}</h3>
               <p className="mt-3 leading-relaxed text-white/65">{item.text}</p>
             </SpotlightCard>
@@ -186,50 +117,122 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Endings and the report */}
-      <section className={`${column} py-20`}>
+      <section id="featured-courses" className={`${column} scroll-mt-32 py-20`}>
         <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300/80">Every choice counts</p>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">See how you worked with AI.</h2>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-300/80">
+            Featured courses
+          </p>
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">
+            Start with a short, hands-on course.
+          </h2>
           <p className="mt-4 max-w-2xl text-lg text-white/65">
-            Skip a question and Cody builds the wrong thing. Approve too quickly and the problem ships. At the end you get a report based on what you actually did, scored on the four AI Fluency competencies.
+            A selection from the same catalogue as Courses — software, communication
+            and more.
           </p>
         </Reveal>
-        <ul className="mt-10 grid gap-5 md:grid-cols-3">
-          {ENDINGS.map((ending, index) => (
-            <li key={ending.label}>
-              <SpotlightCard delay={index * 100} className="h-full p-5">
-                <p className={`text-sm font-semibold ${ending.tone}`}>{ending.label}</p>
-                <p className="mt-2 text-white/70">{ending.text}</p>
-              </SpotlightCard>
-            </li>
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {featured.map((course, index) => (
+            <FeaturedCourseCard key={course.id} course={course} delay={index * 80} />
           ))}
-        </ul>
-        <Reveal delay={150} className={`mt-5 ${glass} p-6 shadow-2xl sm:p-8`}>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">Project report</p>
-          <p className="mt-1 text-xl font-semibold">How you worked with AI</p>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {FLUENCY.map((item) => (
-              <div key={item.title} className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold">{item.title}</p>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${RATING[item.rating]}`}>{item.rating}</span>
-                </div>
-                <p className="mt-2 text-sm text-white/60">{item.text}</p>
-              </div>
-            ))}
-          </div>
+        </div>
+        <Reveal delay={180} className="mt-8 text-center">
+          <Link href="/courses" className={secondary}>
+            Browse all courses
+          </Link>
         </Reveal>
       </section>
 
-      {/* Closing call to action */}
+      <section id="tour" className={`${column} scroll-mt-32 py-20`}>
+        <Reveal>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-fuchsia-300/80">
+            Immersive practice
+          </p>
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">
+            Harbour Clinic, as a learning activity.
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg text-white/65">
+            Immersive project simulations are one of several interactive activity
+            types. Lead a client project with AI teammates on a simulated desktop —
+            then return to your course with verified progress.
+          </p>
+        </Reveal>
+        <Reveal delay={120} className={`mt-10 ${glass} overflow-hidden p-2 shadow-2xl sm:p-3`}>
+          <video
+            id="tour-player"
+            controls
+            playsInline
+            preload="none"
+            poster="/promo/devpath-tour-poster.jpg"
+            className="aspect-video w-full rounded-2xl bg-black"
+            aria-label="DevPath product tour: Harbour Clinic immersive project in 30 seconds"
+          >
+            <source
+              src="/promo/devpath-tour-1080.mp4"
+              type="video/mp4"
+              media="(min-width: 1280px)"
+            />
+            <source src="/promo/devpath-tour-720.mp4" type="video/mp4" />
+          </video>
+        </Reveal>
+        <Reveal delay={180} className="mt-8 flex flex-wrap gap-3">
+          <TourLink className={secondary}>Watch the 30s tour</TourLink>
+          <Link
+            href={authAware("/projects/harbour-clinic", signedIn)}
+            className={primary}
+          >
+            Open Harbour Clinic
+          </Link>
+        </Reveal>
+      </section>
+
+      <section id="educators" className={`${column} scroll-mt-32 py-20`}>
+        <Reveal>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300/80">
+            For educators
+          </p>
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">
+            Teaching Studio for real courses.
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg text-white/65">
+            Create courses with AI, customise lessons, invite students and monitor
+            learning outcomes — while keeping full student learning access on the
+            same account.
+          </p>
+        </Reveal>
+        <div className="mt-12 grid gap-5 md:grid-cols-3">
+          {EDUCATOR.map((item, index) => (
+            <SpotlightCard key={item.title} delay={index * 80} className="h-full p-7">
+              <h3 className="text-xl font-semibold">{item.title}</h3>
+              <p className="mt-3 leading-relaxed text-white/65">{item.text}</p>
+            </SpotlightCard>
+          ))}
+        </div>
+        <Reveal delay={180} className="mt-8">
+          <Link
+            href={authAware("/onboarding?intent=teach", signedIn)}
+            className={secondary}
+          >
+            Start Teaching
+          </Link>
+        </Reveal>
+      </section>
+
       <section className={`${column} pb-24 pt-10 text-center`}>
         <Reveal>
-          <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">Ready for your first client?</h2>
-          <p className="mt-4 text-lg text-white/65">Your progress is saved as you go, so you can stop and pick up later.</p>
-          <Link href="/projects" className={`${primary} mt-8`}>
-            Browse projects
-          </Link>
+          <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">
+            Build your next learning path.
+          </h2>
+          <p className="mt-4 text-lg text-white/65">
+            Explore published courses or generate a personal path with AI.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link href="/courses" className={primary}>
+              Explore Courses
+            </Link>
+            <Link href={authAware("/my-courses", signedIn)} className={secondary}>
+              Create with AI
+            </Link>
+          </div>
         </Reveal>
       </section>
 
@@ -237,5 +240,40 @@ export default function Home() {
         DevPath · COMP5241 group project
       </footer>
     </div>
+  );
+}
+
+function FeaturedCourseCard({
+  course,
+  delay,
+}: {
+  course: Course;
+  delay: number;
+}) {
+  const minutes =
+    course.estimatedMinutes ??
+    course.lessons.reduce((sum, lesson) => sum + lesson.minutes, 0);
+
+  return (
+    <Reveal delay={delay}>
+      <Link href={`/courses/${course.id}`} className="block h-full">
+        <SpotlightCard className="h-full p-6">
+          <div className="flex items-center gap-4">
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500/30 via-violet-500/20 to-fuchsia-500/30 text-2xl">
+              {course.emoji}
+            </span>
+            <div>
+              <h3 className="text-lg font-semibold">{course.title}</h3>
+              <p className="text-xs text-white/45">
+                {course.domain ?? "General"} · {course.level} · {course.lessons.length}{" "}
+                lessons · ~{minutes} min
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-white/60">{course.tagline}</p>
+          <p className="mt-5 text-sm font-medium text-white/75">Open course →</p>
+        </SpotlightCard>
+      </Link>
+    </Reveal>
   );
 }

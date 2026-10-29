@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { newActivity } from "../src/lib/learning/registry";
 const teacher = "00000000-0000-4000-8000-000000000001",
   student = "00000000-0000-4000-8000-000000000002",
   outsider = "00000000-0000-4000-8000-000000000003",
@@ -48,6 +49,18 @@ test("database enforces role, ownership, enrolment, publication and evidence bou
       "utf8",
     ),
   );
+  const hiddenState = readFileSync("supabase/migrations/20261027103619_protect_simulation_hidden_state.sql", "utf8");
+  await db.exec(hiddenState);
+  await db.exec(hiddenState);
+  const registryTypes = readFileSync("supabase/migrations/20261027103817_restore_activity_registry_types.sql", "utf8");
+  await db.exec(registryTypes);
+  await db.exec(registryTypes);
+  const onboarding = readFileSync(
+    "supabase/migrations/20261029120000_onboarding_and_instructor_activation.sql",
+    "utf8",
+  );
+  await db.exec(onboarding);
+  await db.exec(onboarding);
   await db.exec(
     `insert into auth.users values ('${teacher}','teacher@example.test',now()),('${student}','student@example.test',now()),('${outsider}','outsider@example.test',now()),('${otherTeacher}','other@example.test',now()); update public.profiles set role='instructor' where id in ('${teacher}','${otherTeacher}');`,
   );
@@ -179,6 +192,16 @@ test("database enforces role, ownership, enrolment, publication and evidence bou
     `update public.courses set updated_at = now() where id = '${course}' returning id`,
   );
   assert.equal(touched[0].rows[0].id, course);
+  const restoredDocument = {
+    id: course,
+    lessons: [{ id: "restored-lesson", blocks: [newActivity("simulation"), newActivity("code-review"), newActivity("project")] }],
+  };
+  const documentSql = JSON.stringify(restoredDocument).replace(/'/g, "''");
+  const savedRestoration = await as(teacher, `update public.courses set document='${documentSql}'::jsonb where id='${course}' returning document`);
+  assert.equal((savedRestoration[0].rows[0].document as typeof restoredDocument).lessons[0].blocks.length, 3);
+  const unknownType = structuredClone(restoredDocument);
+  Object.assign(unknownType.lessons[0].blocks[0], { activityType: "execute-code" });
+  await assert.rejects(as(teacher, `update public.courses set document='${JSON.stringify(unknownType).replace(/'/g, "''")}'::jsonb where id='${course}'`), /check constraint/);
   const invited = await as(
     teacher,
     `insert into public.course_invitations(course_id,email) values('${course}','extra@example.test') returning email`,
@@ -297,21 +320,12 @@ test("database enforces role, ownership, enrolment, publication and evidence bou
   await db.exec(
     `insert into public.simulation_sessions(id,user_id,course_id,lesson_id,activity_id,activity_snapshot,state,version) values('20000000-0000-4000-8000-000000000001','${student}','${course}','l','a','{}','{"stageId":"start","step":0,"variables":{}}',1)`,
   );
-  assert.equal(
-    (await as(student, "select * from public.simulation_sessions"))[0].rows
-      .length,
-    1,
-  );
-  assert.equal(
-    (await as(outsider, "select * from public.simulation_sessions"))[0].rows
-      .length,
-    0,
-  );
-  assert.equal(
-    (await as(teacher, "select * from public.simulation_sessions"))[0].rows
-      .length,
-    0,
-  );
+  for (const caller of [student, outsider, teacher]) {
+    await assert.rejects(as(caller, "select * from public.simulation_sessions"), /permission/);
+  }
+  await db.exec("set role service_role");
+  assert.equal((await db.exec("select * from public.simulation_sessions"))[0].rows.length, 1);
+  await db.exec("reset role");
   await assert.rejects(
     as(
       student,
@@ -355,5 +369,51 @@ test("database enforces role, ownership, enrolment, publication and evidence bou
     1,
   );
   await db.exec("reset role");
+
+  const unverified = "00000000-0000-4000-8000-000000000005";
+  await db.exec(
+    `insert into auth.users values ('${unverified}','unverified@example.test',null)`,
+  );
+
+  await assert.rejects(
+    as(unverified, "select public.activate_instructor()"),
+    /Confirm your email first/i,
+  );
+  await assert.rejects(
+    as(
+      outsider,
+      `update public.profiles set role='instructor' where id='${outsider}'`,
+    ),
+    /Only an administrator may assign roles|permission|role/i,
+  );
+  await assert.rejects(
+    as(outsider, `update public.profiles set role='admin' where id='${outsider}'`),
+    /Only an administrator may assign roles|permission|role/i,
+  );
+
+  assert.equal(
+    (
+      await as(
+        unverified,
+        `select onboarding_completed_at is null as open from public.profiles where id='${unverified}'`,
+      )
+    )[0].rows[0].open,
+    true,
+  );
+
+  const activated = await as(outsider, "select public.activate_instructor() as role");
+  assert.equal(activated[0].rows[0].role, "instructor");
+  const again = await as(outsider, "select public.activate_instructor() as role");
+  assert.equal(again[0].rows[0].role, "instructor");
+  const outsiderProfile = (
+    await as(
+      outsider,
+      `select role, intended_workspace, onboarding_completed_at is not null as onboarded from public.profiles where id='${outsider}'`,
+    )
+  )[0].rows[0];
+  assert.equal(outsiderProfile.role, "instructor");
+  assert.equal(outsiderProfile.intended_workspace, "teach");
+  assert.equal(outsiderProfile.onboarded, true);
+
   await db.close();
 });
