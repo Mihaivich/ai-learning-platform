@@ -9,6 +9,7 @@ import { projectDraftSchema, type ProjectDraft } from "../src/lib/projects/gener
 import { harbourClinicDraft } from "../src/lib/projects/generated/draft-example";
 import { generateProject } from "../src/lib/projects/generated/generate";
 import { checkProject } from "../src/lib/projects/generated/validate";
+import { readProfile } from "../src/lib/projects/generated/profile";
 import {
   askClient,
   chooseAction,
@@ -107,7 +108,7 @@ test("a cue shared by two facts is a warning, not a problem", async () => {
   assert.equal(check.warnings.some((warning) => warning.includes('"budget"')), true);
 });
 
-test("a draft that fails its checks goes back to the model once, with the problems", async () => {
+test("a draft that fails its checks goes back to the model with the problems", async () => {
   resetModelCooldowns();
   const broken = copy(harbourClinicDraft);
   broken.facts.detail.sampleQuestion = "Why is the morning rush so busy?";
@@ -123,6 +124,20 @@ test("a draft that fails its checks goes back to the model once, with the proble
   assert.equal(result.scenario.id, "gen-1");
   assert.match(prompts[1], /failed these checks/);
   assert.match(prompts[1], /detail fact/);
+});
+
+test("a draft that keeps failing gets two repairs, then gives up with the problems", async () => {
+  resetModelCooldowns();
+  const broken = copy(harbourClinicDraft);
+  broken.facts.detail.sampleQuestion = "Why is the morning rush so busy?";
+  let calls = 0;
+  const call: ModelCall = async () => {
+    calls++;
+    return JSON.stringify(broken);
+  };
+  const result = await generateProject({ domain: "software", topic: "clinic bookings" }, { id: "gen-6", call, models: ["fake"] });
+  assert.equal(calls, 3);
+  assert.ok("error" in result && result.check?.problems.some((problem) => problem.includes("detail fact")));
 });
 
 test("generation reports an error when no model returns a valid draft", async () => {
@@ -266,6 +281,30 @@ test("a subject mission passes the subject and the learner to the model", async 
   assert.equal("error" in result, false);
   assert.match(prompt, /Subject to learn: statistics/);
   assert.match(prompt, /The learner: a second-year nursing student/);
+});
+
+test("the learner's level reaches the model, and without a topic the model picks one", async () => {
+  resetModelCooldowns();
+  let prompt = "";
+  const call: ModelCall = async (_model, request) => {
+    prompt = request.prompt;
+    return JSON.stringify(harbourClinicDraft);
+  };
+  await generateProject(
+    { domain: "healthcare", topic: "", subject: "statistics", learner: "a nurse", level: "none" },
+    { id: "gen-5", call, models: ["fake"] },
+  );
+  assert.match(prompt, /Topic: \(none given: choose one\)/);
+  assert.match(prompt, /The learner's level: new to the subject/);
+});
+
+test("a profile reads the old course system's codes as descriptions and ignores unknown levels", () => {
+  assert.deepEqual(readProfile({ background: "cs_student", experience: "some" }), { background: "a computer science student", level: "some" });
+  assert.deepEqual(readProfile({ background: " a second-year nursing student ", experience: "expert" }), {
+    background: "a second-year nursing student",
+    level: null,
+  });
+  assert.deepEqual(readProfile(null), { background: "", level: null });
 });
 
 test("a flawed walkthrough that explains itself, or a client who names the concept, fails the checks", async () => {

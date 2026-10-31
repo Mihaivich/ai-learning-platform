@@ -4,10 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { glass } from "@/components/home/glass";
 import { useAuth } from "@/lib/auth-store";
+import { LEVEL_LABELS, LEVELS, readProfile, type Level } from "@/lib/projects/generated/profile";
+import { getSupabase } from "@/lib/supabase/client";
 
-const FIELDS = ["Marketing", "Event planning", "Data analysis", "Teaching", "Journalism", "Hospitality"];
+const FIELDS = ["Healthcare", "Marketing", "Event planning", "Data analysis", "Teaching", "Journalism", "Hospitality"];
+
+const SUBJECTS = ["Statistics", "Economics", "Psychology", "Chemistry", "Accounting", "Ethics"];
 
 const EXAMPLES: Record<string, string> = {
+  Healthcare: "whether a new hand gel reduced infections on a ward",
   Marketing: "a loyalty programme for a neighbourhood café",
   "Event planning": "a charity fun run for a primary school",
   "Data analysis": "a weekly sales report for a bike shop",
@@ -31,10 +36,34 @@ export function CreateProject() {
   const { ready, user } = useAuth();
   const [domain, setDomain] = useState("");
   const [topic, setTopic] = useState("");
+  const [subject, setSubject] = useState("");
+  const [background, setBackground] = useState("");
+  const [level, setLevel] = useState<Level | null>(null);
   const [status, setStatus] = useState<"idle" | "working" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ id: string; title: string } | null>(null);
   const [seconds, setSeconds] = useState(0);
+
+  // The profile from earlier projects fills the form in.
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!user || !supabase) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("background,experience")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const profile = readProfile(data);
+        setBackground((current) => current || profile.background);
+        setLevel((current) => current ?? profile.level);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (status !== "working") return;
@@ -52,7 +81,7 @@ export function CreateProject() {
       const res = await fetch("/api/projects/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ domain, topic }),
+        body: JSON.stringify({ domain, topic, subject, profile: { background, level } }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
@@ -105,10 +134,41 @@ export function CreateProject() {
   const working = status === "working";
   const stage = [...STAGES].reverse().find((item) => seconds >= item.after) ?? STAGES[0];
   const example = EXAMPLES[domain] ?? "a loyalty programme for a neighbourhood café";
+  const chip = (on: boolean) =>
+    `rounded-full border px-3 py-1 text-sm ${on ? "border-cyan-300 bg-cyan-300/10 text-white" : "border-white/15 text-white/70 hover:border-white/40"}`;
 
   return (
     <form onSubmit={submit} className={`${glass} p-7`}>
       <fieldset disabled={working} className="space-y-6">
+        <div>
+          <label htmlFor="project-background" className="font-semibold">About you</label>
+          <p className="mt-1 text-sm text-white/50">The project is set in your world, and the Handbook explains ideas with examples from it. Saved for next time.</p>
+          <input id="project-background" value={background} onChange={(event) => setBackground(event.target.value)} maxLength={160} placeholder="a second-year nursing student" className={input} />
+        </div>
+        <div>
+          <label htmlFor="project-subject" className="font-semibold">Subject to learn <span className="font-normal text-white/45">(optional)</span></label>
+          <p className="mt-1 text-sm text-white/50">The job then teaches two of its ideas. Your AI teammate gets them wrong, and you catch it.</p>
+          <input id="project-subject" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={80} placeholder="Statistics" className={input} />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {SUBJECTS.map((item) => (
+              <button key={item} type="button" onClick={() => setSubject(subject === item ? "" : item)} className={chip(subject === item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+          {subject.trim() && (
+            <div className="mt-4" role="radiogroup" aria-label="Your level in the subject">
+              <p className="text-sm text-white/70">How much {subject.trim()} do you know?</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {LEVELS.map((item) => (
+                  <button key={item} type="button" role="radio" aria-checked={level === item} onClick={() => setLevel(item)} className={chip(level === item)}>
+                    {LEVEL_LABELS[item]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <div>
           <label htmlFor="project-field" className="font-semibold">Field</label>
           <input id="project-field" value={domain} onChange={(event) => setDomain(event.target.value)} maxLength={80} required minLength={2} placeholder="Marketing" className={input} />
@@ -118,7 +178,7 @@ export function CreateProject() {
                 key={field}
                 type="button"
                 onClick={() => setDomain(field)}
-                className={`rounded-full border px-3 py-1 text-sm ${domain === field ? "border-cyan-300 bg-cyan-300/10 text-white" : "border-white/15 text-white/70 hover:border-white/40"}`}
+                className={chip(domain === field)}
               >
                 {field}
               </button>
@@ -126,9 +186,15 @@ export function CreateProject() {
           </div>
         </div>
         <div>
-          <label htmlFor="project-topic" className="font-semibold">What is the job?</label>
-          <p className="mt-1 text-sm text-white/50">One line about the client and what they want. The AI works out what goes wrong.</p>
-          <input id="project-topic" value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={200} required minLength={4} placeholder={example} className={input} />
+          <label htmlFor="project-topic" className="font-semibold">
+            What is the job? {subject.trim() && <span className="font-normal text-white/45">(optional)</span>}
+          </label>
+          <p className="mt-1 text-sm text-white/50">
+            {subject.trim()
+              ? `Leave it blank and the AI picks a job in this field where ${subject.trim().toLowerCase()} matters.`
+              : "One line about the client and what they want. The AI works out what goes wrong."}
+          </p>
+          <input id="project-topic" value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={200} required={!subject.trim()} minLength={4} placeholder={example} className={input} />
         </div>
       </fieldset>
 

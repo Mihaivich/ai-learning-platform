@@ -104,7 +104,11 @@ export async function checkProject(
   const [missesProblem, missesRule] = [flawWords("missesProblem"), flawWords("missesRule")];
   const shared = [...missesProblem].filter((word) => missesRule.has(word)).length;
   if (shared / new Set([...missesProblem, ...missesRule]).size > 0.45) {
-    problems.push("The missesProblem and missesRule versions make the same mistake. Each must go wrong for its own concept alone.");
+    problems.push(
+      "The missesProblem and missesRule versions make the same mistake. Each must go wrong for its own concept alone: " +
+        "missesProblem gets the problem concept wrong and handles the rule correctly; missesRule handles the problem correctly " +
+        "and gets the rule concept wrong, so their walkthroughs show different results.",
+    );
   }
 
   // Success has to be something the client can count.
