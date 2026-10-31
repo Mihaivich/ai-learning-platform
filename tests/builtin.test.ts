@@ -4,7 +4,7 @@ import { offlineEvaluator } from "../src/lib/projects/evaluate";
 import { buildScenario } from "../src/lib/projects/generated/build";
 import { projectDraftSchema } from "../src/lib/projects/generated/draft";
 import { checkProject } from "../src/lib/projects/generated/validate";
-import { askClient, chooseAction, endInterview, projectView, sendBack, startProject, submitBrief, submitRequirements, type ProjectStep } from "../src/lib/projects/runtime";
+import { askClient, chooseAction, endInterview, projectView, requestChanges, sendBack, startProject, submitBrief, submitRequirements, type ProjectStep } from "../src/lib/projects/runtime";
 import { getProjectScenario } from "../src/lib/projects";
 import { projectListings } from "../src/lib/projects/catalog";
 import { parcelPalDraft } from "../src/lib/projects/parcelpal";
@@ -67,5 +67,7 @@ for (const [id, draft] of Object.entries(drafts)) {
     const fixed = await sendBack(scenario, state, { ...flawed.problemLines[0], explanation: draft.concepts!.problem.explanation }, offlineEvaluator);
     assert.equal(fixed.state.variables.variant, "good");
     assert.equal(projectView(scenario, fixed.state, []).work?.reviews[0].correct, true);
+    // Once fixed there is nothing left to send back for: only approving remains.
+    assert.throws(() => requestChanges(scenario, fixed.state, flawed.problemLines[0]), /already fixed/);
   });
 }

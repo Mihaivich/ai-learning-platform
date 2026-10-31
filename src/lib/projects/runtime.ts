@@ -268,6 +268,10 @@ export function requestChanges(
   requireStage(state, "review", "There's nothing to review right now.");
   const variant = currentVariant(scenario, state);
   if (!variant) throw new SimulationError(`${scenario.assistant.name} hasn't delivered anything yet.`, 409);
+  // A version has at most one problem: once it's fixed, there is nothing left to send back for.
+  if (memoOf(state).reviews.some((review) => review.correct)) {
+    throw new SimulationError(`${scenario.assistant.name} has already fixed what you found. Approve the work when you're ready.`, 409);
+  }
   const track = trackOf(state);
   let correct = false;
   const review: ProjectMemo["reviews"][number] = { variant: variant.id, correct };

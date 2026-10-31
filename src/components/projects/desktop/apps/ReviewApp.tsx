@@ -24,6 +24,8 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
 
   const failing = work.checks.some((check) => !check.passed);
   const merged = !reviewing;
+  // Every version has at most one problem, so once it's fixed the only thing left is to approve.
+  const fixed = work.reviews.some((review) => review.correct);
 
   return (
     <div className="h-full overflow-y-auto bg-white text-[13px]">
@@ -76,7 +78,7 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
                       <button
                         key={line}
                         type="button"
-                        disabled={!reviewing}
+                        disabled={!reviewing || fixed}
                         onClick={() => setPicked(selected ? null : { path: file.path, line })}
                         aria-pressed={selected}
                         className={`flex w-full min-w-max text-left ${selected ? "bg-amber-200" : "bg-emerald-50/60 hover:bg-blue-50"} disabled:cursor-default`}
@@ -123,7 +125,8 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
 
         {reviewing && (
           <div className="sticky bottom-0 -mx-5 border-t border-black/10 bg-white/95 px-5 py-3 backdrop-blur">
-            {!engineering && (
+            {fixed && <p className="mb-3 text-stone-700">{agent} has fixed what you found. Check the new version, then approve it.</p>}
+            {!engineering && !fixed && (
               <fieldset className="mb-3">
                 <legend className="font-medium text-stone-900">If you send it back, why?</legend>
                 <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -136,7 +139,7 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
                 </div>
               </fieldset>
             )}
-            {needsNote && (
+            {needsNote && !fixed && (
               <label className="mb-3 block">
                 <span className="font-medium text-stone-900">Your note for {agent}</span>
                 <span className="block text-stone-500">What goes wrong, and why? {agent} learns from the why.</span>
@@ -151,28 +154,30 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
               </label>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={busy || !ready}
-                onClick={async () => {
-                  const explanation = needsNote ? note.trim() : undefined;
-                  const ok = engineering
-                    ? picked && (await send({ op: "request-changes", path: picked.path, line: picked.line, explanation }))
-                    : await send({ op: "request-changes", reasonId: reason, explanation });
-                  if (ok) {
-                    setPicked(null);
-                    setReason("");
-                    setNote("");
-                  }
-                }}
-                className="rounded-md border border-black/15 bg-white px-3 py-1.5 font-medium text-stone-800 shadow-sm disabled:opacity-40"
-              >
-                {engineering
-                  ? picked
-                    ? `Request changes on ${picked.path.split("/").pop()}:${picked.line}`
-                    : "Click a line to request changes"
-                  : "Send it back"}
-              </button>
+              {!fixed && (
+                <button
+                  type="button"
+                  disabled={busy || !ready}
+                  onClick={async () => {
+                    const explanation = needsNote ? note.trim() : undefined;
+                    const ok = engineering
+                      ? picked && (await send({ op: "request-changes", path: picked.path, line: picked.line, explanation }))
+                      : await send({ op: "request-changes", reasonId: reason, explanation });
+                    if (ok) {
+                      setPicked(null);
+                      setReason("");
+                      setNote("");
+                    }
+                  }}
+                  className="rounded-md border border-black/15 bg-white px-3 py-1.5 font-medium text-stone-800 shadow-sm disabled:opacity-40"
+                >
+                  {engineering
+                    ? picked
+                      ? `Request changes on ${picked.path.split("/").pop()}:${picked.line}`
+                      : "Click a line to request changes"
+                    : "Send it back"}
+                </button>
+              )}
               {approve && (
                 <button
                   type="button"
