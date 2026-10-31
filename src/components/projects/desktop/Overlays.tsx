@@ -64,13 +64,21 @@ const OUTCOME: Record<string, { label: string; className: string }> = {
   failure: { label: "It went wrong", className: "bg-rose-50 text-rose-900 border-rose-200" },
   incomplete: { label: "Out of time", className: "bg-stone-50 text-stone-900 border-stone-200" },
 };
+const CONCEPT_OUTCOME: Record<string, string> = {
+  prevented: "Prevented",
+  caught: "Caught",
+  shipped: "Missed",
+  "left-out": "Left out",
+  "not-reached": "Not reached",
+};
+
 const RATING: Record<string, string> = {
   strong: "bg-emerald-100 text-emerald-800",
   mixed: "bg-amber-100 text-amber-800",
   weak: "bg-rose-100 text-rose-800",
 };
 
-/** End-of-project report: outcome plus the four AI Fluency cards. */
+/** End-of-project report: outcome, the concepts the job taught, and the four AI Fluency cards. */
 export function Report({ view, busy, onClose, onRestart, exitHref }: { view: ProjectView; busy: boolean; onClose: () => void; onRestart: () => void; exitHref: string }) {
   const completion = view.completion;
   if (!completion) return null;
@@ -109,6 +117,33 @@ export function Report({ view, busy, onClose, onRestart, exitHref }: { view: Pro
             </ul>
           </div>
         </div>
+        {completion.concepts.length > 0 && (
+          <div className="border-t border-black/10 px-6 py-5">
+            <h2 className="text-[15px] font-semibold text-stone-900">The ideas this job depended on</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {completion.concepts.map((concept) => (
+                <div key={concept.name} className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 text-[13px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-stone-900">{concept.name}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${RATING[concept.rating]}`}>{CONCEPT_OUTCOME[concept.outcome]}</span>
+                  </div>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-stone-700">
+                    <li>{concept.found ? "You found it on the call." : "It didn't come up on the call."}</li>
+                    <li>{concept.summary}</li>
+                  </ul>
+                  <p className="mt-2 text-stone-600"><span className="font-medium text-stone-800">The classic mistake:</span> {concept.misconception}</p>
+                  {concept.note && (
+                    <div className="mt-3 rounded-lg border border-black/10 bg-white p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Your note</p>
+                      <p className="mt-1 italic text-stone-800">&ldquo;{concept.note.text}&rdquo;</p>
+                      <p className={`mt-2 rounded-md px-2 py-1 ${concept.note.rating === "strong" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{concept.note.feedback}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="border-t border-black/10 px-6 py-5">
           <h2 className="text-[15px] font-semibold text-stone-900">How you worked with AI</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">

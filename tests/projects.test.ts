@@ -214,8 +214,46 @@ test("a note that catches a concept's flaw is graded on what goes wrong and why"
 
   state = track(run.history, chooseAction(scenario, state, "approve"));
   state = track(run.history, chooseAction(scenario, state, "release-measure"));
-  const discernment = projectView(scenario, state, run.history).completion!.cards.find((card) => card.competency === "discernment")!;
-  assert.ok(discernment.evidence.some((line) => line.includes("that's race conditions")));
+  const [race, audit] = projectView(scenario, state, run.history).completion!.concepts;
+  assert.equal(race.outcome, "caught");
+  assert.equal(race.rating, "strong");
+  assert.equal(race.note?.text, note);
+  assert.match(race.note?.feedback ?? "", /that's race conditions/);
+  // The brief said cancelling keeps the record, so the audit-trail mistake never happened.
+  assert.equal(audit.outcome, "prevented");
+});
+
+test("the report says, for each concept, whether it was found, prevented, caught, left out or missed", async () => {
+  // A brief with every constraint: both mistakes are prevented, even the one never asked about.
+  let run = await throughInterview("pick-product");
+  let state = track(run.history, await submitRequirements(scenario, run.state, GOOD_REQUIREMENTS, offlineEvaluator));
+  state = track(run.history, await submitBrief(scenario, state, GOOD_BRIEF, offlineEvaluator));
+  state = track(run.history, chooseAction(scenario, state, "approve"));
+  state = track(run.history, chooseAction(scenario, state, "release-measure"));
+  let concepts = projectView(scenario, state, run.history).completion!.concepts;
+  assert.deepEqual(concepts.map((item) => [item.found, item.outcome, item.rating]), [[true, "prevented", "strong"], [false, "prevented", "strong"]]);
+
+  // A brief with neither: the audit-trail flaw comes first and is caught; the fix also
+  // covers the race, which nothing ever tested.
+  run = await throughInterview("pick-product");
+  state = track(run.history, await submitRequirements(scenario, run.state, GOOD_REQUIREMENTS, offlineEvaluator));
+  state = track(run.history, await submitBrief(scenario, state, "Build the staff booking board. No patient accounts.", offlineEvaluator));
+  assert.equal(state.variables.variant, "delete-on-cancel");
+  state = track(run.history, await sendBack(scenario, state, { reasonId: "cancel-deletes", explanation: "Cancelling deletes it." }, offlineEvaluator));
+  state = track(run.history, chooseAction(scenario, state, "approve"));
+  state = track(run.history, chooseAction(scenario, state, "release-measure"));
+  concepts = projectView(scenario, state, run.history).completion!.concepts;
+  assert.deepEqual(concepts.map((item) => item.outcome), ["left-out", "caught"]);
+  assert.equal(concepts[1].rating, "mixed");
+
+  // Approving the race version ships the mistake.
+  run = await throughInterview("pick-product");
+  state = track(run.history, await submitRequirements(scenario, run.state, GOOD_REQUIREMENTS, offlineEvaluator));
+  state = track(run.history, await submitBrief(scenario, state, "Build the staff booking board. Cancelling must keep the record.", offlineEvaluator));
+  state = track(run.history, chooseAction(scenario, state, "approve"));
+  state = track(run.history, chooseAction(scenario, state, "release-now"));
+  concepts = projectView(scenario, state, run.history).completion!.concepts;
+  assert.deepEqual(concepts.map((item) => [item.outcome, item.rating]), [["shipped", "weak"], ["prevented", "strong"]]);
 });
 
 test("a note that only says what to change gets pointed to the Handbook", async () => {
