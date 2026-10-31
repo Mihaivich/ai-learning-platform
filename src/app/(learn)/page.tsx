@@ -11,6 +11,7 @@ const DESK: Record<AppId, string> = {
   mail: "Read the brief: the client's request, a ticket from the people who'll use the system and a note from your manager.",
   call: "Interview the client. They know what's really wrong, but they only answer what you ask.",
   notes: "Write the requirements, including how everyone will know the work succeeded.",
+  handbook: "Look up the ideas the job depends on, explained through what you already know.",
   cody: "Brief the AI coding agent. It builds exactly what you describe, gaps and all.",
   review: "Check what comes back. Approve it, or send it back with a clear reason.",
   launch: "Choose how to release it, then see how it plays out.",
@@ -118,7 +119,7 @@ export default function Home() {
       <section id="how" className={`${column} scroll-mt-32 py-20`}>
         <Reveal>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/80">How it works</p>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">One desktop, six tools.</h2>
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-5xl">One desktop, seven tools.</h2>
           <p className="mt-4 max-w-2xl text-lg text-white/65">Each project brings a new client and a new problem. The tools, and the habits they build, stay the same.</p>
         </Reveal>
         <ol className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

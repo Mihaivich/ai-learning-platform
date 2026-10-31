@@ -1,0 +1,431 @@
+{
+  "title": "Ward 4B Infection Audit",
+  "tagline": "Lead a statistical evaluation of ward infection data using an AI analytics teammate.",
+  "summary": "Sister Brenda wants proof that a new sanitising hand gel reduced catheter-associated infections on Ward 4B. You lead the project: investigate the audit data, direct your AI analytics agent, evaluate the statistical findings, and submit a rigorous report to the Infection Control Committee.",
+  "domain": "healthcare",
+  "deliverable": "the ward audit report",
+  "learnerRole": "You are a second-year nursing student leading a two-week clinical audit project at St Jude's Hospital.",
+  "client": {
+    "name": "Sister Brenda Vance",
+    "role": "Ward Unit Manager",
+    "organisation": "St Jude's Hospital (Ward 4B)",
+    "persona": "Sister Brenda Vance, senior ward unit manager for Ward 4B. Practical, busy, fiercely protective of her nursing staff, and non-statistical. Speaks directly about ward routine, bed turnover, and clinical care. Cares deeply about passing hospital audits but tends to focus on raw patient counts rather than statistical denominators or risk adjustments."
+  },
+  "assistant": {
+    "name": "Nova",
+    "kind": "AI statistical analyst"
+  },
+  "manager": {
+    "name": "Marcus",
+    "note": "You have two weeks for this student audit placement. Nova is ready to run the data analysis for you. Keep me updated on your progress."
+  },
+  "user": {
+    "from": "Nurse Sam (Infection Control Liaison)",
+    "subject": "Infection numbers on Ward 4B last month",
+    "body": "Hi! Sister Brenda says infection numbers fell after we switched to the new gel in October, but we had five empty beds for two weeks. I'm worried the raw numbers don't tell the full story."
+  },
+  "clientEmail": {
+    "subject": "Can you make us a report showing the new gel worked?",
+    "body": "Hello,\n\nWe switched Ward 4B to the new hand gel in October. We noticed fewer infection cases on the ward chart, and I need a report to show the Infection Control Committee that the gel reduced our infections. Can you start this week?\n\nThank you,\nSister Brenda"
+  },
+  "firstMoves": {
+    "call": "Book a call with Sister Brenda before starting the analysis",
+    "delegate": {
+      "label": "Ask Nova to generate a chart showing reduced infection counts immediately",
+      "feedback": "You delegated before checking how infection rates are calculated. Nova produced a chart of raw counts that ignores ward occupancy changes."
+    },
+    "quote": {
+      "label": "Promise Sister Brenda a report confirming the gel's success",
+      "feedback": "You committed to a outcome before analysing the data. Sister Brenda assumes the report will automatically support her request."
+    }
+  },
+  "interview": {
+    "opening": "Thanks for coming by. The Infection Control Committee meets soon, and I want to show them our new hand gel worked. What information do you need from me?",
+    "vagueReplies": [
+      "I just want a clear chart showing our ward infection numbers dropped.",
+      "The committee likes neat graphs. Can you make sure it looks convincing?",
+      "We just look at the ward chart on the wall each month. Isn't that enough?"
+    ]
+  },
+  "facts": {
+    "problem": {
+      "text": "Raw infection counts fell from 12 to 8, but ward occupancy dropped from 600 patient-days to 250 patient-days, so the infection rate per patient-day actually increased.",
+      "reply": "In September we had 12 infections across 600 total patient-days when the ward was full. In October we only had 8 infections, but the ward was half empty due to maintenance, so we only logged 250 patient-days total.",
+      "cues": [
+        "occupancy",
+        "patient-day",
+        "bed-day",
+        "raw count",
+        "denominator",
+        "empty beds",
+        "rate"
+      ],
+      "sampleQuestion": "What was the total occupancy in patient-day numbers during those two months, beyond the raw count?"
+    },
+    "rule": {
+      "text": "Confounding variables must be controlled: Ward 4B absorbed high-risk surgical transfers in October, skewing baseline patient severity.",
+      "reply": "During October, Ward 2 was renovated so we took seven high-risk surgical patients with central lines. Surgical cases like that carry a much higher baseline infection risk than our usual medical patients.",
+      "cues": [
+        "confound",
+        "risk profile",
+        "surgical",
+        "severity",
+        "case mix",
+        "patient type",
+        "underlying"
+      ],
+      "sampleQuestion": "Did the patient type or underlying surgical risk profile change between September and October?"
+    },
+    "scope": {
+      "text": "Audit covers Ward 4B catheter-associated infections over 6 months; hospital-wide staff gel preference surveys are out of scope.",
+      "reply": "We only want to audit catheter-associated infections on Ward 4B across the six-month window. Don't worry about hospital-wide staff surveys or other wards; our budget is just two weeks of work.",
+      "cues": [
+        "scope",
+        "ward 4b",
+        "other wards",
+        "hospital-wide",
+        "six months",
+        "timeframe",
+        "budget"
+      ],
+      "sampleQuestion": "Which ward timeframe is in scope, and what is the project budget?"
+    },
+    "detail": {
+      "text": "The new gel dispensers were installed at 15 bed spaces on October 1st.",
+      "reply": "We installed the new dispensers at all 15 bed spaces on the morning of October 1st. Staff logged gel usage daily.",
+      "cues": [
+        "bed space",
+        "october",
+        "dispenser",
+        "log",
+        "gel bottle",
+        "shift"
+      ],
+      "sampleQuestion": "When were the bed space dispensers installed and how was gel usage logged?"
+    },
+    "environment": {
+      "text": "Data must be analysed using standard hospital Excel spreadsheets on ward workstations without external statistical packages.",
+      "reply": "We store everything in standard Excel spreadsheets on the ward workstation. Hospital IT blocks external statistical software like R or SPSS.",
+      "cues": [
+        "excel",
+        "workstation",
+        "software",
+        "locked",
+        "terminal",
+        "spreadsheet",
+        "install"
+      ],
+      "sampleQuestion": "What spreadsheet software and workstation access will we use for the audit data?"
+    },
+    "success": {
+      "text": "Success means producing an infection rate per 1,000 patient-days report accepted without revision by the Infection Control Committee.",
+      "reply": "If the Infection Control Committee accepts our rate per 1000 patient-days analysis without sending it back for revisions, I'll consider this audit a total success.",
+      "cues": [
+        "success",
+        "committee",
+        "accept",
+        "measure",
+        "target",
+        "rate per",
+        "revision"
+      ],
+      "sampleQuestion": "How will you measure success, and what target will the committee accept?"
+    }
+  },
+  "requirements": {
+    "problem": {
+      "label": "Calculate infection rates per 1,000 patient-days using total bed occupancy as the denominator",
+      "cues": [
+        [
+          "rate",
+          "per 1,000",
+          "per 1000"
+        ],
+        [
+          "patient-day",
+          "bed-day",
+          "occupancy",
+          "denominator"
+        ]
+      ]
+    },
+    "rule": {
+      "label": "Adjust for confounding variables by stratifying high-risk surgical patients",
+      "cues": [
+        [
+          "confound",
+          "confounding",
+          "stratify",
+          "stratification"
+        ],
+        [
+          "surgical",
+          "risk profile",
+          "severity",
+          "case mix"
+        ]
+      ]
+    },
+    "scope": {
+      "label": "Audit restricted to Ward 4B catheter infections over 6 months; no hospital-wide survey",
+      "cues": [
+        [
+          "ward 4b",
+          "only ward 4b"
+        ],
+        [
+          "six months",
+          "6 months",
+          "no survey",
+          "out of scope"
+        ]
+      ]
+    },
+    "success": {
+      "label": "Success measure: Infection Control Committee acceptance of the rate report",
+      "cues": [
+        [
+          "committee",
+          "accept",
+          "acceptance",
+          "target",
+          "success",
+          "measure"
+        ]
+      ]
+    },
+    "environment": {
+      "label": "Analysis formatted for standard hospital Excel software on ward workstations",
+      "cues": [
+        [
+          "excel",
+          "spreadsheet",
+          "workstation",
+          "ward pc"
+        ]
+      ]
+    }
+  },
+  "constraints": {
+    "problem": {
+      "label": "Calculate rates per patient-day rather than comparing raw infection counts",
+      "cues": [
+        [
+          "rate",
+          "per patient-day",
+          "per 1,000",
+          "denominator"
+        ],
+        [
+          "occupancy",
+          "bed-day",
+          "raw count",
+          "total counts"
+        ]
+      ]
+    },
+    "rule": {
+      "label": "Control for confounding patient risk factors by stratifying surgical vs medical admissions",
+      "cues": [
+        [
+          "confound",
+          "stratify",
+          "control for",
+          "adjust"
+        ],
+        [
+          "risk",
+          "surgical",
+          "severity",
+          "case mix"
+        ]
+      ]
+    },
+    "scope": {
+      "label": "Limit focus strictly to Ward 4B infection records; exclude hospital-wide staff surveys",
+      "cues": [
+        [
+          "ward 4b",
+          "only"
+        ],
+        [
+          "no survey",
+          "exclude",
+          "scope",
+          "out of scope"
+        ]
+      ]
+    }
+  },
+  "deliverables": {
+    "good": {
+      "title": "Ward 4B Infection Audit Report",
+      "summary": "Analyses infection rates per 1,000 patient-days for Ward 4B and stratifies by patient risk profile. Shows that despite lower raw counts, infection rates increased due to reduced occupancy, while high-risk surgical transfers confounded the baseline risk.",
+      "demo": [
+        {
+          "action": "Nova calculates infection metrics for September and October.",
+          "result": "September rate is 20 per 1,000 patient-days (12/600). October rate is 32 per 1,000 patient-days (8/250)."
+        },
+        {
+          "action": "Nova stratifies the October data by patient risk profile.",
+          "result": "Medical patients had 4 infections per 200 patient-days (20/1,000). Surgical transfers had 4 infections per 50 patient-days (80/1,000)."
+        },
+        {
+          "action": "Sister Brenda reviews the Excel report on the ward workstation.",
+          "result": "The file opens smoothly in hospital Excel with clear stratified tables."
+        }
+      ]
+    },
+    "missesProblem": {
+      "title": "Ward 4B Infection Audit Report",
+      "summary": "Compares total infection numbers before and after hand gel introduction. Concludes the gel reduced infections by 33% based on raw counts alone.",
+      "demo": [
+        {
+          "action": "Nova plots raw infection numbers for September and October.",
+          "result": "September shows 12 cases; October shows 8 cases."
+        },
+        {
+          "action": "Nova calculates percentage change without using patient-day occupancy.",
+          "result": "Report claims a 33% reduction in ward infections."
+        },
+        {
+          "action": "Sister Brenda prepares the summary for the committee.",
+          "result": "The summary highlights the drop from 12 to 8 cases without mentioning patient-day occupancy."
+        }
+      ]
+    },
+    "missesRule": {
+      "title": "Ward 4B Infection Audit Report",
+      "summary": "Calculates infection rates per patient-day for all Ward 4B patients together, October's surgical transfers included, and reports the gel's effect.",
+      "demo": [
+        {
+          "action": "Nova calculates overall infection rates per 1,000 patient-days.",
+          "result": "September rate: 20 per 1,000. October rate: 32 per 1,000."
+        },
+        {
+          "action": "Nova compares overall monthly rates without risk stratification.",
+          "result": "Report concludes the new hand gel caused a statistically significant increase in infections."
+        },
+        {
+          "action": "Nurse Sam reviews the patient logs.",
+          "result": "Surgical transfer cases with central lines accounted for half the October infections, masking low rates in standard medical beds."
+        }
+      ]
+    },
+    "scopeCreep": {
+      "title": "Ward 4B Infection Audit & Hospital-Wide Survey Report",
+      "summary": "Includes patient-day rate calculations for Ward 4B alongside an unrequested 40-page survey of staff hand gel scent preferences across 12 hospital wards.",
+      "demo": [
+        {
+          "action": "Nova calculates rate per 1,000 patient-days for Ward 4B.",
+          "result": "October rate is correctly identified as higher due to low occupancy."
+        },
+        {
+          "action": "Nova tabulates hospital-wide survey results.",
+          "result": "Includes 200 responses rating gel fragrance, bottle ergonomics, and skin moisture."
+        },
+        {
+          "action": "Sister Brenda looks at the report length.",
+          "result": "The document expands to 55 pages, exceeding the audit committee's submission limit."
+        }
+      ]
+    }
+  },
+  "reviewReasons": {
+    "problem": "The report relies on raw infection counts instead of calculating rates per patient-day",
+    "rule": "The analysis fails to control for confounding variables like patient risk severity",
+    "scope": "It includes unrequested hospital-wide staff surveys outside our audit scope",
+    "distractor": "The audit chart colors do not match the hospital's clinical branding guidelines"
+  },
+  "release": {
+    "measured": {
+      "label": "Submit report to Infection Control Committee and track audit feedback for two weeks",
+      "feedback": "You submit the rate report and monitor committee feedback against Sister Brenda's success target."
+    },
+    "pilot": {
+      "label": "Present draft audit to the Lead Infection Nurse before full committee submission",
+      "feedback": "You spend three days reviewing the stratified calculations with the lead nurse to ensure methodological rigor."
+    },
+    "now": {
+      "label": "Submit the report directly to the Hospital Board today",
+      "feedback": "You bypass clinical review and send the audit straight to executive leadership."
+    }
+  },
+  "endings": {
+    "success": "Two weeks later, the Infection Control Committee commends the report's rigorous patient-day rates and risk stratification. Sister Brenda receives approval for ward-wide infection control improvements.",
+    "failureProblem": "At the committee meeting, the Lead Epidemiologist points out that raw counts ignored ward occupancy: infection rates actually doubled in October. The report is rejected for basic statistical errors.",
+    "failureRule": "The report claims the new gel increased infections, causing panic among ward staff. A peer review reveals the audit ignored high-risk surgical transfers, invalidating your conclusion.",
+    "partialProblem": "The lead nurse catches the missing patient-day denominator during draft review. You fix the calculation, but the delay pushes submission past the committee deadline.",
+    "partialRule": "The lead nurse points out that surgical transfers confounded the October numbers. You re-stratify the data, but the extra analysis causes the project to overrun.",
+    "partialOther": "The rate calculation is correct, but the bloated hospital-wide survey distracted the committee from Ward 4B's key findings, leaving them unable to judge the gel's efficacy."
+  },
+  "debrief": {
+    "missedFact": {
+      "problem": "You did not investigate ward occupancy, missing the fact that total patient-days dropped dramatically in October.",
+      "rule": "You did not ask about patient case mix changes, missing the surgical transfer confounder in October.",
+      "scope": "You did not clarify the project boundaries, leading to wasted effort on out-of-scope hospital surveys.",
+      "success": "You did not establish a clear success measure with Sister Brenda before starting the audit."
+    },
+    "missedRequirement": {
+      "problem": "Your requirements failed to specify that infection metrics must be calculated as rates per patient-day.",
+      "rule": "Your requirements failed to require controlling for confounding patient risk factors.",
+      "scope": "Your requirements failed to limit the audit scope strictly to Ward 4B.",
+      "success": "Your requirements lacked a defined acceptance target for the Infection Control Committee.",
+      "environment": "Your requirements ignored the constraint of using hospital Excel on ward workstations."
+    },
+    "missedConstraint": {
+      "problem": "Your brief did not tell Nova to calculate rates per patient-day, so it defaulted to raw infection counts.",
+      "rule": "Your brief did not instruct Nova to stratify data by patient risk profile to control for confounders.",
+      "scope": "Your brief did not constrain Nova's scope, resulting in an unrequested hospital-wide survey."
+    }
+  },
+  "trust": {
+    "call": "You spoke with Sister Brenda first to clarify how ward infection data is collected.",
+    "quote": "You promised positive audit findings before examining the raw infection data.",
+    "thorough": "Your questions uncovered the occupancy shift and surgical patient confounder.",
+    "metric": "You agreed on committee acceptance of rate-per-1000-bed-days as the success measure.",
+    "wrongReview": "You returned Nova's work for an irrelevant reason, delaying the audit timeline.",
+    "measured": "You submitted the report to the committee and tracked feedback against your target.",
+    "releaseNow": "You sent unverified audit conclusions directly to hospital leadership without review.",
+    "success": "The committee accepted the statistically sound report without requesting revisions.",
+    "failure": "Flawed statistical logic in your report was exposed during the committee meeting."
+  },
+  "reportNotes": {
+    "scopeKept": "Your brief kept Nova focused strictly on Ward 4B catheter infection data.",
+    "pilot": "Piloting the report with the Lead Infection Nurse caught minor formatting issues before committee review."
+  },
+  "concepts": {
+    "problem": {
+      "name": "Rates vs raw counts",
+      "explanation": "A raw count measures how many times an event occurred, but it ignores exposure time or population size. A rate divides the raw count by an appropriate denominator (such as patient-days or bed-days) to measure true risk. Comparing raw counts across periods with different denominators leads to false conclusions because a drop in total events can mask an increase in underlying risk if occupancy falls even faster.",
+      "bridge": "Think of counting car crashes on a highway: 10 crashes during a snowstorm weekend with 1,000 cars is a far higher crash rate than 15 crashes on a clear Monday with 50,000 cars.",
+      "misconception": "If the total number of infection cases dropped, the infection risk on the ward must have decreased.",
+      "inTheJob": "Ward 4B logged fewer total infections in October, but ward occupancy dropped even more. Evaluating true risk requires calculating infections per patient-day.",
+      "cues": [
+        "occupancy",
+        "patient-day",
+        "bed-day",
+        "raw count",
+        "denominator"
+      ]
+    },
+    "rule": {
+      "name": "Confounding variables",
+      "explanation": "A confounding variable is an unmeasured or unadjusted factor that correlates with both the supposed cause and the outcome, creating a false association. In clinical studies, changes in underlying patient risk (such as illness severity or surgical status) can mask the true effect of an intervention unless researchers control for or stratify by that confounding variable.",
+      "bridge": "Imagine testing if a new running shoe makes people faster, but the runners wearing the new shoe are all trained sprinters while the control group are casual joggers. The runner experience confounds the effect of the shoe.",
+      "misconception": "Comparing infection rates before and after introducing a gel proves cause and effect without controlling for underlying patient risk.",
+      "inTheJob": "High-risk surgical transfers were moved to Ward 4B in October. Their higher baseline infection risk confounds the comparison between September and October unless stratified.",
+      "cues": [
+        "confound",
+        "risk profile",
+        "surgical",
+        "severity",
+        "case mix"
+      ]
+    }
+  },
+  "samples": {
+    "requirements": "Calculate infection rates per 1,000 patient-days using total bed occupancy as the denominator. Control for confounding variables by stratifying high-risk surgical transfer patients. Limit scope strictly to Ward 4B catheter infections over 6 months; no hospital-wide survey. Analysis must be formatted for hospital Excel software on ward workstations. Success target is Infection Control Committee acceptance.",
+    "brief": "Calculate infection rates per 1,000 patient-days rather than comparing raw infection counts, using total bed occupancy as the denominator. Control for confounding patient risk factors by stratifying surgical vs medical admissions. Limit focus strictly to Ward 4B infection records and exclude hospital-wide staff surveys."
+  }
+}

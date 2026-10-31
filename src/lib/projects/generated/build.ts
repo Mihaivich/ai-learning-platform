@@ -103,6 +103,12 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
       { kind: "users", name: draft.user.from, role: "Will use the result", note: "Lives with whatever you ship, and is the first to notice what you missed." },
     ],
     words: { deliverable: draft.deliverable ?? "the work", manager: draft.manager.name },
+    concepts: draft.concepts
+      ? (["problem", "rule"] as const).map((role) => {
+          const { name, explanation, bridge, misconception, inTheJob } = draft.concepts![role];
+          return { id: `K-${role}`, fact: FACT_IDS[role], name, explanation, bridge, misconception, inTheJob };
+        })
+      : undefined,
     reportNotes: draft.reportNotes,
     facts,
     inbox: [

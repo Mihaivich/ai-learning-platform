@@ -85,6 +85,23 @@ export type CastMember = {
   note: string;
 };
 
+/**
+ * A Handbook entry on a concept the job depends on. It unlocks when the learner
+ * uncovers its fact, and in any case before the review.
+ */
+export type ProjectConcept = {
+  id: string;
+  /** The fact that unlocks it. */
+  fact: string;
+  name: string;
+  explanation: string;
+  /** An analogy from the learner's own field. */
+  bridge: string;
+  /** The wrong belief the assistant's flawed version acts on. */
+  misconception: string;
+  inTheJob: string;
+};
+
 /** A short email that follows from the learner's first move. */
 export type FollowUp = { subject: string; body: string };
 
@@ -106,6 +123,8 @@ export type ProjectScenario = {
     /** The learner's manager, as named in their email. */
     manager: string;
   };
+  /** Handbook entries. A project without any shows no Handbook. */
+  concepts?: ProjectConcept[];
   /** Mails after the first move. Generic wording is used when a scenario has none. */
   followUps?: { call: FollowUp; delegate: FollowUp; delegateCall: FollowUp; quote: FollowUp };
   /** Scenario-specific sentences in the report, where the runtime has no generic wording. */

@@ -46,6 +46,19 @@ const deliverable = z.object({
 
 const choice = z.object({ label: text(120), feedback: text(300) });
 
+/**
+ * A subject concept the job depends on. The assistant's flawed version acts on
+ * the misconception, so the learner understands the concept by catching it.
+ */
+const concept = z.object({
+  name: text(60).describe('The concept\'s usual name, such as "Confounding variables".'),
+  explanation: text(700).describe("What it means, in general and in plain words, as a short handbook entry. Not about this job."),
+  bridge: text(400).describe("An analogy from the learner's own field or everyday life that makes it click."),
+  misconception: text(240).describe("The common wrong belief, stated as the belief, such as \"If two things change together, one caused the other.\""),
+  inTheJob: text(300).describe("How the concept shows up in this job, without giving away which delivered version is wrong."),
+  cues: z.array(cue).min(2).max(8).describe("Words for the concept that also appear in its fact and its flawed walkthrough."),
+});
+
 const factRoles = {
   problem: fact,
   rule: fact,
@@ -148,6 +161,13 @@ export const projectDraftSchema = z.object({
     scopeKept: text(200).describe('Praise when the brief kept the assistant in scope: "Your brief kept X to ...".'),
     pilot: text(200).describe("Praise for piloting first."),
   }),
+  concepts: z
+    .object({
+      problem: concept.describe("The concept behind the problem fact. The missesProblem version acts on its misconception."),
+      rule: concept.describe("The concept behind the rule fact. The missesRule version acts on its misconception."),
+    })
+    .optional()
+    .describe("Required when the job teaches a subject."),
   samples: z
     .object({
       requirements: text(1500).describe("Model requirements covering all five items, using their cues."),

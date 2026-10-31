@@ -106,6 +106,26 @@ export const harbourClinic: ProjectScenario = {
     { kind: "users", name: "Mandy & Kit", role: "Receptionists", note: "Share one PC and one spreadsheet. They'll use whatever you ship." },
   ],
   words: { deliverable: "the booking board", manager: "Leo" },
+  concepts: [
+    {
+      id: "K-problem",
+      fact: "F1",
+      name: "Race conditions",
+      explanation: "A race condition happens when two people or programs act on the same thing at almost the same moment, and the result depends on who gets there first. Each one checks that the thing is free, sees that it is, and goes ahead, because the other hasn't saved yet. A check that runs before saving can't see a save that hasn't happened. The fix is to make checking and saving a single step that only one of them can win, such as a rule in the database that refuses the second save.",
+      bridge: "Think of two ticket windows selling the last seat on a bus at the same second. Both clerks look at the seat chart, both see the seat free, and both sell it.",
+      misconception: "Checking that a slot is free before saving is enough to stop two people booking it.",
+      inTheJob: "Mandy and Kit book in the morning rush, often within seconds of each other. A safeguard only counts if it holds when they save at the same moment, not just one after the other.",
+    },
+    {
+      id: "K-rule",
+      fact: "F2",
+      name: "Audit trails",
+      explanation: "An audit trail is a record of what happened that is kept rather than overwritten or deleted, so that someone can check it later. Instead of removing an item, the system marks it with a status such as Cancelled, and keeps when it happened. Many organisations must keep these records for years, for the law or for inspections, so deleting is not an option even when an item no longer matters day to day.",
+      bridge: "It's like crossing out a line in a paper diary instead of tearing out the page: the entry stops counting, but anyone can still see it was there.",
+      misconception: "Once something is cancelled it is no longer needed, so the cleanest thing is to delete it.",
+      inTheJob: "The clinic is checked by auditors and has to keep its appointment history. Watch what happens to an appointment when it is cancelled.",
+    },
+  ],
   followUps: {
     call: { subject: "Re: Can you build us an app?", body: "Of course! I have a few minutes between patients right now. I'll ring you on Meet.\n\nGrace" },
     delegate: { subject: "Started: patient booking app", body: "I scaffolded a patient booking app with sign-up, login and online booking. I assumed patients will book themselves. Two days of work so far.\n\nCody" },
