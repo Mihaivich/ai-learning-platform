@@ -79,7 +79,7 @@ const RATING: Record<string, string> = {
 };
 
 /** End-of-project report: outcome, the concepts the job taught, and the four AI Fluency cards. */
-export function Report({ view, busy, onClose, onRestart, exitHref }: { view: ProjectView; busy: boolean; onClose: () => void; onRestart: () => void; exitHref: string }) {
+export function Report({ view, busy, onClose, onRestart, exit }: { view: ProjectView; busy: boolean; onClose: () => void; onRestart: () => void; exit: { href: string; label: string } }) {
   const completion = view.completion;
   if (!completion) return null;
   const outcome = OUTCOME[completion.outcome] ?? OUTCOME.incomplete;
@@ -161,7 +161,7 @@ export function Report({ view, busy, onClose, onRestart, exitHref }: { view: Pro
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t border-black/10 px-6 py-4">
-          <a href={exitHref} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">Leave the desktop</a>
+          <a href={exit.href} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">{exit.label}</a>
           <button type="button" onClick={onClose} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">Look around</button>
           <button type="button" disabled={busy} onClick={onRestart} className="rounded-md bg-blue-600 px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">Play again</button>
         </div>

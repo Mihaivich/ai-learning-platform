@@ -14,8 +14,10 @@ async function framing(scenarioId: string) {
   // Signed out: the desktop asks the visitor to sign in before anything is loaded.
   if (!db || !auth.user) return { title: "Your project", summary: "Sign in to open a project you created." };
   // Row-level security returns only the owner's own projects, and only their listing columns.
-  const { data } = await db.from("generated_projects").select("title,summary").eq("id", scenarioId).maybeSingle();
-  return data ? { title: data.title as string, summary: data.summary as string } : null;
+  const { data } = await db.from("generated_projects").select("title,summary,path_id").eq("id", scenarioId).maybeSingle();
+  if (!data) return null;
+  const exit = data.path_id ? { href: `/paths/${data.path_id}`, label: "Back to your path" } : undefined;
+  return { title: data.title as string, summary: data.summary as string, exit };
 }
 
 export default async function ProjectPage({
@@ -26,5 +28,5 @@ export default async function ProjectPage({
   const { scenarioId } = await params;
   const shown = await framing(scenarioId);
   if (!shown) notFound();
-  return <Desktop scenarioId={scenarioId} title={shown.title} summary={shown.summary} />;
+  return <Desktop scenarioId={scenarioId} title={shown.title} summary={shown.summary} exit={"exit" in shown ? shown.exit : undefined} />;
 }

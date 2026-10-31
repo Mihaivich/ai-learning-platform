@@ -48,7 +48,12 @@ export async function loadGeneratedScenario(id: string, ownerId: string): Promis
   return buildScenario(draft.data, { id: data.id, version: TEMPLATE_VERSION });
 }
 
-export async function saveGeneratedProject(ownerId: string, request: ProjectRequest, project: GeneratedProject) {
+export async function saveGeneratedProject(
+  ownerId: string,
+  request: ProjectRequest,
+  project: GeneratedProject,
+  path?: { id: string; step: number },
+) {
   const { error } = await recordDb().from("generated_projects").insert({
     id: project.scenario.id,
     owner_id: ownerId,
@@ -60,7 +65,10 @@ export async function saveGeneratedProject(ownerId: string, request: ProjectRequ
     draft: project.draft,
     template_version: TEMPLATE_VERSION,
     model: project.model,
+    ...(path ? { path_id: path.id, path_step: path.step } : {}),
   });
+  // 23505: another request already made this step's project.
+  if (error?.code === "23505" && path) throw new HttpError(409, "This step already has a project. Reload the page.");
   if (error) throw new HttpError(503, "The project was written but could not be saved. Please retry.");
 }
 
