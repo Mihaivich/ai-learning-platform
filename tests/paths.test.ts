@@ -92,3 +92,17 @@ test("path ids are unguessable and match the table's check", () => {
   for (const id of ids) assert.ok(isPathId(id) && /^path-[a-z0-9]{10,32}$/.test(id));
   assert.equal(isPathId("path-../etc"), false);
 });
+
+test("without a field, the plan and the project take it from the learner", async () => {
+  resetModelCooldowns();
+  const prompts: string[] = [];
+  const call: ModelCall = async (_model, req) => {
+    prompts.push(req.prompt);
+    return JSON.stringify(prompts.length === 1 ? { ...plan, field: "nursing" } : harbourClinicDraft);
+  };
+  const planned = await planPath({ ...request, domain: "" }, { call, models: ["fake"] });
+  assert.ok(!("error" in planned) && planned.plan.field === "nursing");
+  await generateProject({ domain: "", topic: "", subject: "statistics", learner: "a nurse" }, { id: "gen-8", call, models: ["fake"] });
+  assert.match(prompts[0], /Field: \(none given: the learner's own field/);
+  assert.match(prompts[1], /Domain: \(none given: the learner's own field\)/);
+});

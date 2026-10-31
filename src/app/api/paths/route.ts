@@ -10,7 +10,7 @@ export const maxDuration = 120;
 
 const bodySchema = z.object({
   subject: z.string().trim().min(2).max(80),
-  domain: z.string().trim().min(2).max(80),
+  domain: z.string().trim().max(80).default(""),
   profile: profileSchema.optional(),
 });
 
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   try {
     const { db, user } = await requireAccount();
     const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-    if (!parsed.success) throw new HttpError(400, "Give a subject and a field (2 to 80 characters each).");
+    if (!parsed.success) throw new HttpError(400, "Give a subject to learn (2 to 80 characters).");
     if (!hasGeminiKey()) throw new HttpError(503, "Learning paths are not available on this server.");
     const { subject, domain, profile } = parsed.data;
     if (profile && !(await saveProfile(db, user.id, profile))) console.warn("Could not save the learner profile");

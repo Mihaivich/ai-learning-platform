@@ -8,19 +8,7 @@ import { useAuth } from "@/lib/auth-store";
 import { LEVEL_LABELS, LEVELS, readProfile, type Level } from "@/lib/projects/generated/profile";
 import { getSupabase } from "@/lib/supabase/client";
 
-const FIELDS = ["Healthcare", "Marketing", "Event planning", "Data analysis", "Teaching", "Journalism", "Hospitality"];
-
 const SUBJECTS = ["Software engineering", "Statistics", "Economics", "Psychology", "Chemistry", "Accounting", "Ethics"];
-
-const EXAMPLES: Record<string, string> = {
-  Healthcare: "whether a new hand gel reduced infections on a ward",
-  Marketing: "a loyalty programme for a neighbourhood café",
-  "Event planning": "a charity fun run for a primary school",
-  "Data analysis": "a weekly sales report for a bike shop",
-  Teaching: "a revision timetable for a Year 11 class",
-  Journalism: "a fact-checking workflow for a student newspaper",
-  Hospitality: "a breakfast menu change for a small hotel",
-};
 
 // What the learner sees while the AI works; a generation takes about a minute.
 const STAGES = [
@@ -43,7 +31,6 @@ export function CreateProject() {
   const router = useRouter();
   // One project, or a learning path of several that teach one subject.
   const [mode, setMode] = useState<"project" | "path">("project");
-  const [domain, setDomain] = useState("");
   const [topic, setTopic] = useState("");
   const [subject, setSubject] = useState("");
   const [background, setBackground] = useState("");
@@ -92,7 +79,7 @@ export function CreateProject() {
       const res = await fetch(path ? "/api/paths" : "/api/projects/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(path ? { domain, subject, profile } : { domain, topic, subject, profile }),
+        body: JSON.stringify(path ? { subject, profile } : { topic, subject, profile }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
@@ -151,7 +138,6 @@ export function CreateProject() {
   const stage = path
     ? { text: "Planning three projects, two new ideas in each…" }
     : ([...STAGES].reverse().find((item) => seconds >= item.after) ?? STAGES[0]);
-  const example = EXAMPLES[domain] ?? "a loyalty programme for a neighbourhood café";
   const chip = (on: boolean) =>
     `rounded-full border px-3 py-1 text-sm ${on ? "border-cyan-300 bg-cyan-300/10 text-white" : "border-white/15 text-white/70 hover:border-white/40"}`;
 
@@ -175,7 +161,7 @@ export function CreateProject() {
         </div>
         <div>
           <label htmlFor="project-background" className="font-semibold">About you</label>
-          <p className="mt-1 text-sm text-white/50">The project is set in your world, and the Handbook explains ideas with examples from it. Saved for next time.</p>
+          <p className="mt-1 text-sm text-white/50">Your role or field. The job is set in your world, and the Handbook explains ideas with examples from it. Saved for next time.</p>
           <input id="project-background" value={background} onChange={(event) => setBackground(event.target.value)} maxLength={160} placeholder="a second-year nursing student" className={input} />
         </div>
         <div>
@@ -206,22 +192,6 @@ export function CreateProject() {
             </div>
           )}
         </div>
-        <div>
-          <label htmlFor="project-field" className="font-semibold">Field</label>
-          <input id="project-field" value={domain} onChange={(event) => setDomain(event.target.value)} maxLength={80} required minLength={2} placeholder="Marketing" className={input} />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {FIELDS.map((field) => (
-              <button
-                key={field}
-                type="button"
-                onClick={() => setDomain(field)}
-                className={chip(domain === field)}
-              >
-                {field}
-              </button>
-            ))}
-          </div>
-        </div>
         {!path && (
           <div>
             <label htmlFor="project-topic" className="font-semibold">
@@ -229,10 +199,10 @@ export function CreateProject() {
             </label>
             <p className="mt-1 text-sm text-white/50">
               {subject.trim()
-                ? `Leave it blank and the AI picks a job in this field where ${subject.trim().toLowerCase()} matters.`
+                ? `Leave it blank and the AI picks a job in your world where ${subject.trim().toLowerCase()} matters.`
                 : "One line about the client and what they want. The AI works out what goes wrong."}
             </p>
-            <input id="project-topic" value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={200} required={!subject.trim()} minLength={4} placeholder={example} className={input} />
+            <input id="project-topic" value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={200} required={!subject.trim()} minLength={4} placeholder="a loyalty programme for a neighbourhood café" className={input} />
           </div>
         )}
       </fieldset>

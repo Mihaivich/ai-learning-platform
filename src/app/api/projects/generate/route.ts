@@ -14,9 +14,10 @@ import { apiError, HttpError, requireAccount } from "@/lib/supabase/server";
 export const maxDuration = 300;
 
 // With a subject the topic may be left out: the model picks a job where the subject matters.
+// The field is optional too: the model takes it from the learner's background.
 const bodySchema = z
   .object({
-    domain: z.string().trim().min(2).max(80),
+    domain: z.string().trim().max(80).default(""),
     topic: z.string().trim().max(200).default(""),
     subject: z.string().trim().max(80).default(""),
     profile: profileSchema.optional(),
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     const { db, user } = await requireAccount();
     const parsed = bodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
-      throw new HttpError(400, "Give a field (2 to 80 characters), and a job (4 to 200 characters) or a subject to learn.");
+      throw new HttpError(400, "Give a subject to learn, or a job (4 to 200 characters).");
     }
     const { domain, topic, subject, profile } = parsed.data;
     if (!hasGeminiKey()) throw new HttpError(503, "Project generation is not available on this server.");
