@@ -9,7 +9,7 @@ import { getSupabase } from "@/lib/supabase/client";
 
 const FIELDS = ["Healthcare", "Marketing", "Event planning", "Data analysis", "Teaching", "Journalism", "Hospitality"];
 
-const SUBJECTS = ["Statistics", "Economics", "Psychology", "Chemistry", "Accounting", "Ethics"];
+const SUBJECTS = ["Software engineering", "Statistics", "Economics", "Psychology", "Chemistry", "Accounting", "Ethics"];
 
 const EXAMPLES: Record<string, string> = {
   Healthcare: "whether a new hand gel reduced infections on a ward",
