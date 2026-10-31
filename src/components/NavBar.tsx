@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-store";
 
 const glow = "transition duration-300 hover:[text-shadow:0_0_10px_rgba(255,255,255,0.8),0_0_20px_rgba(255,255,255,0.5)]";
@@ -15,6 +16,24 @@ const menuLink = "block rounded-lg px-3 py-2 text-white/80 hover:bg-white/10";
 export function NavBar() {
   const { user, signOut } = useAuth();
   const initial = (user?.email || "?").trim().charAt(0).toUpperCase();
+  // Instructors get a link to their classes.
+  const [teacher, setTeacher] = useState(false);
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!user || !supabase) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setTeacher(["instructor", "admin"].includes(data?.role ?? ""));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 lg:top-8 lg:px-4">
@@ -27,6 +46,11 @@ export function NavBar() {
           <Link href="/projects" className={navLink}>
             Projects
           </Link>
+          {user && teacher && (
+            <Link href="/teach" className={navLink}>
+              Teach
+            </Link>
+          )}
           {user ? (
             <details className="relative">
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full px-1 py-0.5 hover:bg-white/10 [&::-webkit-details-marker]:hidden">
