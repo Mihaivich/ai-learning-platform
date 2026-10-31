@@ -32,7 +32,8 @@ test("a customisation sends the base project, the instructions and the material,
 
 test("teaching material makes the concepts required", async () => {
   resetModelCooldowns();
-  const { concepts: _omit, ...withoutConcepts } = tidewaterSwimDraft;
+  const withoutConcepts = structuredClone(tidewaterSwimDraft);
+  delete withoutConcepts.concepts;
   let calls = 0;
   const call: ModelCall = async () => {
     calls++;
