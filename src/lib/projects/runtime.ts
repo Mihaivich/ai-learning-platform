@@ -8,7 +8,7 @@ import {
   type SimulationState,
 } from "@/lib/learning/simulation/engine";
 import type { SimulationOutcome } from "@/lib/learning/simulation/schema";
-import type { Grader, InterviewTurn, ProjectEvaluator } from "./evaluate";
+import { normalise, type Grader, type InterviewTurn, type ProjectEvaluator } from "./evaluate";
 import type {
   ChecklistItem,
   ProjectConcept,
@@ -21,6 +21,7 @@ import type {
 
 export const MAX_WRITING = 3000;
 export const MAX_QUESTION = 500;
+export const MAX_EXPLANATION = 1000;
 
 export type ProjectMemo = {
   scenarioVersion: number;
@@ -36,6 +37,8 @@ export type ProjectMemo = {
     path?: string;
     line?: number;
     correct: boolean;
+    /** The learner's note on why the work goes wrong, graded when it caught a concept's flaw. */
+    explanation?: { text: string; concept?: string; covered: string[]; grader?: Grader };
   }[];
 };
 
@@ -291,6 +294,62 @@ export function requestChanges(
   return system(scenario, next, correct ? "changes-fixed" : "changes-wrong");
 }
 
+/**
+ * What the learner's note has to say about a concept: what goes wrong with the
+ * flawed version, and the idea that explains it.
+ */
+export function explanationItems(scenario: ProjectScenario, concept: ProjectConcept): ChecklistItem[] {
+  const variant = scenario.variants.find((item) => item.id === concept.variant);
+  const symptom = scenario.reviewReasons.find((reason) => reason.id === variant?.problemReason)?.label ?? concept.inTheJob;
+  const nameCues = normalise(concept.name).trim().split(" ").filter((word) => word.length >= 4).map((word) => word.slice(0, 5));
+  return [
+    { id: "what", label: `Says what goes wrong with this version, in any words: ${symptom}`, competency: "discernment", cues: [concept.cues] },
+    { id: "why", label: `Explains why, with the idea of ${concept.name}. The belief "${concept.misconception}" is wrong.`, competency: "discernment", cues: [nameCues] },
+  ];
+}
+
+/**
+ * Sending the work back, with a note on why. When the note catches a flaw that
+ * comes from a concept, it is graded on what goes wrong and why. The grade only
+ * shapes the feedback and the report; what happens next stays scripted.
+ */
+export async function sendBack(
+  scenario: ProjectScenario,
+  state: SimulationState,
+  input: { reasonId?: unknown; path?: unknown; line?: unknown; explanation?: unknown },
+  evaluator: ProjectEvaluator,
+): Promise<ProjectStep> {
+  const written = typeof input.explanation === "string" ? input.explanation.trim() : "";
+  if (written.length > MAX_EXPLANATION) {
+    throw new SimulationError(`Keep your note under ${MAX_EXPLANATION} characters.`);
+  }
+  const step = requestChanges(scenario, state, input);
+  if (!written) return step;
+  const memo = memoOf(step.state);
+  const review = memo.reviews[memo.reviews.length - 1];
+  const concept = review.correct ? scenario.concepts?.find((item) => item.variant === review.variant) : undefined;
+  let explanation: NonNullable<typeof review.explanation> = { text: written, covered: [] };
+  if (concept) {
+    const items = explanationItems(scenario, concept);
+    const result = await evaluator.checklist({ items, text: written });
+    explanation = { text: written, concept: concept.id, covered: validIds(result.covered, items.map((item) => item.id)), grader: result.grader };
+  }
+  const reviews = [...memo.reviews.slice(0, -1), { ...review, explanation }];
+  return { ...step, state: withMemo(step.state, { ...memo, reviews }) };
+}
+
+/** Scripted feedback on a graded note. */
+function explanationFeedback(scenario: ProjectScenario, concept: ProjectConcept, covered: string[]) {
+  const agent = scenario.assistant.name;
+  const what = covered.includes("what");
+  const why = covered.includes("why");
+  const idea = concept.name.toLowerCase();
+  if (what && why) return { rating: "strong" as const, text: `You said what goes wrong and why: that's ${idea}. ${agent} knows why it was wrong, not just what to change.` };
+  if (what) return { rating: "mixed" as const, text: `You said what goes wrong, but not why it happens. The idea behind it is ${idea}: it's in the Handbook.` };
+  if (why) return { rating: "mixed" as const, text: `You explained why it happens (${idea}), but not what it breaks in this job.` };
+  return { rating: "weak" as const, text: `Your note didn't say why it was wrong. The idea behind it is ${concept.name.toLowerCase()}: it's in the Handbook.` };
+}
+
 // ---------------------------------------------------------------------------
 // Public view. Hidden variables, checklists, variant ids and rules stay here.
 
@@ -326,7 +385,7 @@ export type ProjectView = {
   };
   notes: string[];
   /** Handbook entries unlocked so far. Each unlocks with its fact, and all of them by the review. */
-  handbook: { entries: Omit<ProjectConcept, "fact">[]; total: number };
+  handbook: { entries: Omit<ProjectConcept, "fact" | "variant" | "cues">[]; total: number };
   requirements: { text: string; coveredCount: number; total: number } | null;
   brief: { text: string } | null;
   work: {
@@ -336,7 +395,12 @@ export type ProjectView = {
     checks: CodeVariant["checks"];
     demo: CodeVariant["demo"];
     reasons: ProjectScenario["reviewReasons"];
-    reviews: { label: string; correct: boolean }[];
+    reviews: {
+      label: string;
+      correct: boolean;
+      /** Feedback on the learner's note, when it explained a concept's flaw. */
+      explained?: { concept: string; rating: ProjectCard["rating"]; feedback: string };
+    }[];
   } | null;
   actions: { id: string; label: string; description?: string }[];
   history: {
@@ -438,6 +502,10 @@ export function projectCards(
         ? "You approved a pull request with a problem in it. The diff and the checks showed it."
         : "You approved work with a problem in it. The walkthrough showed it.",
     );
+  }
+  for (const review of memo.reviews) {
+    const concept = scenario.concepts?.find((item) => item.id === review.explanation?.concept);
+    if (concept && review.explanation) discernment.push(explanationFeedback(scenario, concept, review.explanation.covered).text);
   }
   if (wrongRequests) {
     discernment.push(
@@ -585,13 +653,18 @@ export function projectView(
           checks: track === "engineering" && state.variables.hasTest === true ? variant.checks : [],
           demo: track === "product" ? variant.demo : [],
           reasons: track === "product" ? scenario.reviewReasons : [],
-          reviews: memo.reviews.map((review) => ({
-            label:
-              track === "engineering"
-                ? `${review.path}, line ${review.line}`
-                : (reasonLabel(review.reasonId) ?? "Request changes"),
-            correct: review.correct,
-          })),
+          reviews: memo.reviews.map((review) => {
+            const concept = scenario.concepts?.find((item) => item.id === review.explanation?.concept);
+            const feedback = concept && review.explanation ? explanationFeedback(scenario, concept, review.explanation.covered) : null;
+            return {
+              label:
+                track === "engineering"
+                  ? `${review.path}, line ${review.line}`
+                  : (reasonLabel(review.reasonId) ?? "Request changes"),
+              correct: review.correct,
+              ...(concept && feedback ? { explained: { concept: concept.name, rating: feedback.rating, feedback: feedback.text } } : {}),
+            };
+          }),
         }
       : null,
     actions:

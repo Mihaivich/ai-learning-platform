@@ -14,6 +14,7 @@ import {
   pickVariant,
   projectView,
   requestChanges,
+  sendBack,
   startProject,
   submitBrief,
   submitRequirements,
@@ -189,6 +190,44 @@ test("the product track sends work back by reason", async () => {
   assert.equal(state.variables.variant, "race");
   state = track(run.history, requestChanges(scenario, state, { reasonId: "double-booking" }));
   assert.equal(state.variables.variant, "good");
+});
+
+test("a note that catches a concept's flaw is graded on what goes wrong and why", async () => {
+  const run = await throughInterview("pick-product");
+  let state = run.state;
+  state = track(run.history, await submitRequirements(scenario, state, GOOD_REQUIREMENTS, offlineEvaluator));
+  state = track(run.history, await submitBrief(scenario, state, "Build the staff booking board. Cancelling must keep the record.", offlineEvaluator));
+  assert.equal(state.variables.variant, "race");
+
+  // A wrong reason is never graded, whatever the note says.
+  state = track(run.history, await sendBack(scenario, state, { reasonId: "styling", explanation: "A race condition: both save at the same time." }, offlineEvaluator));
+  assert.equal(memoOf(state).reviews[0].explanation?.concept, undefined);
+
+  const note = "Mandy and Kit can both save at the same moment, so both bookings go through. It's a race condition: the check runs before either save.";
+  state = track(run.history, await sendBack(scenario, state, { reasonId: "double-booking", explanation: note }, offlineEvaluator));
+  assert.equal(state.variables.variant, "good");
+  assert.deepEqual(memoOf(state).reviews[1].explanation?.covered, ["what", "why"]);
+  const [wrong, right] = projectView(scenario, state, run.history).work!.reviews;
+  assert.equal(wrong.explained, undefined);
+  assert.equal(right.explained?.rating, "strong");
+  assert.match(right.explained?.feedback ?? "", /race conditions/);
+
+  state = track(run.history, chooseAction(scenario, state, "approve"));
+  state = track(run.history, chooseAction(scenario, state, "release-measure"));
+  const discernment = projectView(scenario, state, run.history).completion!.cards.find((card) => card.competency === "discernment")!;
+  assert.ok(discernment.evidence.some((line) => line.includes("that's race conditions")));
+});
+
+test("a note that only says what to change gets pointed to the Handbook", async () => {
+  const run = await throughInterview("pick-product");
+  let state = run.state;
+  state = track(run.history, await submitRequirements(scenario, state, GOOD_REQUIREMENTS, offlineEvaluator));
+  state = track(run.history, await submitBrief(scenario, state, "Build the staff booking board. Cancelling must keep the record.", offlineEvaluator));
+  await assert.rejects(sendBack(scenario, state, { reasonId: "double-booking", explanation: "x".repeat(1001) }, offlineEvaluator), SimulationError);
+  state = track(run.history, await sendBack(scenario, state, { reasonId: "double-booking", explanation: "Please fix the booking logic." }, offlineEvaluator));
+  const review = projectView(scenario, state, run.history).work!.reviews[0];
+  assert.equal(review.explained?.rating, "weak");
+  assert.match(review.explained?.feedback ?? "", /Handbook/);
 });
 
 test("the learner view never exposes variants, checklists or hidden facts before the end", async () => {

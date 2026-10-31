@@ -100,6 +100,10 @@ export type ProjectConcept = {
   /** The wrong belief the assistant's flawed version acts on. */
   misconception: string;
   inTheJob: string;
+  /** The flawed version that acts on the misconception; sending it back asks the learner to explain why. */
+  variant: string;
+  /** Words that show the learner's explanation is about this concept. Used offline. */
+  cues: string[];
 };
 
 /** A short email that follows from the learner's first move. */

@@ -13,7 +13,7 @@ import {
   chooseAction,
   endInterview,
   projectView,
-  requestChanges,
+  sendBack,
   startProject,
   submitBrief,
   submitRequirements,
@@ -45,6 +45,7 @@ const bodySchema = z.discriminatedUnion("op", [
     reasonId: z.string().max(120).optional(),
     path: z.string().max(300).optional(),
     line: z.number().int().optional(),
+    explanation: z.string().max(4000).optional(),
   }),
 ]);
 
@@ -272,7 +273,7 @@ export async function POST(
         step = await submitBrief(scenario, state, body.text, evaluator);
         break;
       case "request-changes":
-        step = requestChanges(scenario, state, body);
+        step = await sendBack(scenario, state, body, evaluator);
         break;
     }
     const saved = await save(existing, stepPatch(existing, step));

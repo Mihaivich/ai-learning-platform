@@ -115,6 +115,8 @@ export const harbourClinic: ProjectScenario = {
       bridge: "Think of two ticket windows selling the last seat on a bus at the same second. Both clerks look at the seat chart, both see the seat free, and both sell it.",
       misconception: "Checking that a slot is free before saving is enough to stop two people booking it.",
       inTheJob: "Mandy and Kit book in the morning rush, often within seconds of each other. A safeguard only counts if it holds when they save at the same moment, not just one after the other.",
+      variant: "race",
+      cues: ["same time", "same moment", "both", "at once", "simultaneous", "race"],
     },
     {
       id: "K-rule",
@@ -124,6 +126,8 @@ export const harbourClinic: ProjectScenario = {
       bridge: "It's like crossing out a line in a paper diary instead of tearing out the page: the entry stops counting, but anyone can still see it was there.",
       misconception: "Once something is cancelled it is no longer needed, so the cleanest thing is to delete it.",
       inTheJob: "The clinic is checked by auditors and has to keep its appointment history. Watch what happens to an appointment when it is cancelled.",
+      variant: "delete-on-cancel",
+      cues: ["delete", "record", "history", "audit", "keep", "seven years"],
     },
   ],
   followUps: {
