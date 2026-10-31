@@ -10,6 +10,7 @@
  */
 import { writeFile } from "node:fs/promises";
 import { generateProject } from "../src/lib/projects/generated/generate";
+import { LEVELS } from "../src/lib/projects/generated/profile";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -21,14 +22,15 @@ async function main() {
   };
   const subject = option("subject");
   const learner = option("learner");
+  const level = LEVELS.find((item) => item === option("level"));
   const [domain, topic, out] = args;
-  if (!domain || !topic) {
-    console.error('Usage: npm run generate:project -- "<domain>" "<topic>" [out.json] [--subject "<subject>"] [--learner "<who>"]');
+  if (!domain || (!topic && !subject)) {
+    console.error('Usage: npm run generate:project -- "<domain>" "<topic>" [out.json] [--subject "<subject>"] [--learner "<who>"] [--level none|some|comfortable]');
     process.exitCode = 1;
     return;
   }
   const started = Date.now();
-  const result = await generateProject({ domain, topic, subject, learner }, { id: "draft-preview" });
+  const result = await generateProject({ domain, topic: topic ?? "", subject, learner, level }, { id: "draft-preview" });
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   if ("error" in result) {
     console.error(`${result.error} (${seconds}s)`);
