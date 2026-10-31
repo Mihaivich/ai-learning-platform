@@ -43,10 +43,13 @@ export function Desktop({
   scenarioId,
   title,
   summary,
+  exit = { href: "/", label: "Leave the desktop" },
 }: {
   scenarioId: string;
   title: string;
   summary: string;
+  /** Where the report's way out leads: home, or back to the learning path this project is a step of. */
+  exit?: { href: string; label: string };
 }) {
   const { ready, user } = useAuth();
   const [view, setView] = useState<ProjectView | null>(null);
@@ -409,7 +412,7 @@ export function Desktop({
         <Report
           view={view}
           busy={busy}
-          exitHref="/"
+          exit={exit}
           onClose={() => setReportOpen(false)}
           onRestart={async () => {
             if (await send({ op: "restart" })) {
