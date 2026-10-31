@@ -1,8 +1,10 @@
 import { harbourClinic } from "./harbour-clinic";
+import { parcelPal } from "./parcelpal";
+import { tidewaterSwim } from "./tidewater-swim";
 import { isGeneratedId, loadGeneratedScenario } from "./generated/store";
 import type { ProjectScenario } from "./types";
 
-export const projectScenarios: ProjectScenario[] = [harbourClinic];
+export const projectScenarios: ProjectScenario[] = [harbourClinic, tidewaterSwim, parcelPal];
 
 /** A built-in project, written in code. */
 export function getProjectScenario(id: string): ProjectScenario | undefined {

@@ -23,4 +23,25 @@ export const harbourClinicListing = {
   skills: ["Interview an AI client", "Brief an AI coding agent", "Review its work", "Release and face the result"],
 } as const satisfies ProjectListing;
 
-export const projectListings: readonly ProjectListing[] = [harbourClinicListing];
+// Built from drafts (tidewater-swim.ts, parcelpal.ts): kept in step with the draft's title by tests/builtin.test.ts.
+export const tidewaterSwimListing = {
+  id: "tidewater-swim",
+  title: "Tidewater Swim School sign-up",
+  tagline: "Hand an AI coding agent someone else's code, then check what else it changed.",
+  summary:
+    "A swim school's online sign-up charges some families the wrong amount, and the freelancer who wrote it has gone. Brief the coding agent on code you didn't write, and check that its fix doesn't break what already worked.",
+  minutes: 20,
+  skills: ["Work on code you didn't write", "Brief an AI coding agent", "Check what else it changed", "Release and face the result"],
+} as const satisfies ProjectListing;
+
+export const parcelPalListing = {
+  id: "parcelpal",
+  title: "ParcelPal delivery charges",
+  tagline: "Fix a bug that only happens on bad networks, without breaking the apps already out there.",
+  summary:
+    "A same-day delivery company keeps charging shops two or three times for one delivery, and the client is sure the server is just slow. Find out when it really happens, then brief the coding agent on a server that phone apps nobody can force to update depend on.",
+  minutes: 20,
+  skills: ["Question the client's theory", "Brief an AI coding agent", "Review its work", "Release and face the result"],
+} as const satisfies ProjectListing;
+
+export const projectListings: readonly ProjectListing[] = [harbourClinicListing, tidewaterSwimListing, parcelPalListing];

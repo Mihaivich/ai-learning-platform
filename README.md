@@ -66,6 +66,7 @@ A run usually makes 4 to 6 requests (about half the interview questions, plus th
 | Area | State |
 |---|---|
 | Harbour Clinic booking board (two tracks, four code versions, several endings) | Done |
+| Tidewater Swim School (regression testing, keeping secrets out of code) and ParcelPal (idempotency, backward compatibility), written as drafts in `tidewater-swim.ts` and `parcelpal.ts` | Done |
 | macOS-style desktop with guided steps, one-by-one mail and sound cues | Done |
 | Public home page with the product tour, and the projects page | Done |
 | Saved runs, restart, sign-in with GitHub or a magic link | Done |
