@@ -3,6 +3,8 @@
  * the AI writes before the in-app flow exists.
  *
  *   npm run generate:project -- "marketing" "a loyalty programme for a café" [out.json]
+ *   npm run generate:project -- "healthcare" "infection rates on a ward" out.json \
+ *     --subject "statistics" --learner "a second-year nursing student"
  *
  * Prints the checks and writes the draft as JSON (stdout when no file is given).
  */
@@ -10,14 +12,23 @@ import { writeFile } from "node:fs/promises";
 import { generateProject } from "../src/lib/projects/generated/generate";
 
 async function main() {
-  const [domain, topic, out] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const option = (name: string) => {
+    const at = args.indexOf(`--${name}`);
+    if (at < 0) return undefined;
+    const [, value] = args.splice(at, 2);
+    return value;
+  };
+  const subject = option("subject");
+  const learner = option("learner");
+  const [domain, topic, out] = args;
   if (!domain || !topic) {
-    console.error('Usage: npm run generate:project -- "<domain>" "<topic>" [out.json]');
+    console.error('Usage: npm run generate:project -- "<domain>" "<topic>" [out.json] [--subject "<subject>"] [--learner "<who>"]');
     process.exitCode = 1;
     return;
   }
   const started = Date.now();
-  const result = await generateProject({ domain, topic }, { id: "draft-preview" });
+  const result = await generateProject({ domain, topic, subject, learner }, { id: "draft-preview" });
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   if ("error" in result) {
     console.error(`${result.error} (${seconds}s)`);

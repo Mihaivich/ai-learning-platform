@@ -11,6 +11,7 @@ import type { SimulationOutcome } from "@/lib/learning/simulation/schema";
 import type { Grader, InterviewTurn, ProjectEvaluator } from "./evaluate";
 import type {
   ChecklistItem,
+  ProjectConcept,
   CodeVariant,
   Competency,
   ProjectScenario,
@@ -324,6 +325,8 @@ export type ProjectView = {
     max: number;
   };
   notes: string[];
+  /** Handbook entries unlocked so far. Each unlocks with its fact, and all of them by the review. */
+  handbook: { entries: Omit<ProjectConcept, "fact">[]; total: number };
   requirements: { text: string; coveredCount: number; total: number } | null;
   brief: { text: string } | null;
   work: {
@@ -546,6 +549,19 @@ export function projectView(
     notes: scenario.facts
       .filter((fact) => memo.interview.revealed.includes(fact.id))
       .map((fact) => fact.text),
+    handbook: {
+      entries: (scenario.concepts ?? [])
+        .filter((concept) => SHOWN_FROM_REVIEW.has(state.stageId) || state.status === "completed" || memo.interview.revealed.includes(concept.fact))
+        .map((concept) => ({
+          id: concept.id,
+          name: concept.name,
+          explanation: concept.explanation,
+          bridge: concept.bridge,
+          misconception: concept.misconception,
+          inTheJob: concept.inTheJob,
+        })),
+      total: scenario.concepts?.length ?? 0,
+    },
     // Which points were covered stays hidden until the debrief, so the brief and
     // review still test the learner's own judgement.
     requirements: memo.requirements

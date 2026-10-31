@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-store";
 import { play, readSoundSetting, unlockSound, writeSoundSetting } from "@/lib/sound";
 import type { ProjectView } from "@/lib/projects/runtime";
-import { appName, appTitle, DOCK, STAGE_APP, nextStep, type AppId, type Op } from "./config";
+import { appName, appTitle, DOCK, dockFor, STAGE_APP, nextStep, type AppId, type Op } from "./config";
 import { AppIcon } from "./icons";
 import { mailbox } from "./mail";
 import { Briefing, Notifications, ProjectWidget, Report, type Notice } from "./Overlays";
@@ -15,6 +15,7 @@ import { CodyApp } from "./apps/CodyApp";
 import { LaunchApp } from "./apps/LaunchApp";
 import { MailApp } from "./apps/MailApp";
 import { NotesApp } from "./apps/NotesApp";
+import { HandbookApp } from "./apps/HandbookApp";
 import { ReviewApp } from "./apps/ReviewApp";
 import { useDesktopSounds } from "./useDesktopSounds";
 
@@ -62,6 +63,8 @@ export function Desktop({
   const [attended, setAttended] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [compact, setCompact] = useState(false);
+  // Seven Dock icons need smaller ones to fit a phone.
+  const [narrow, setNarrow] = useState(false);
   const [sound, setSound] = useState(true);
   const zTop = useRef(10);
   const noticeId = useRef(0);
@@ -88,7 +91,10 @@ export function Desktop({
   useDesktopSounds(view);
 
   useEffect(() => {
-    const update = () => setCompact(window.innerWidth < 900);
+    const update = () => {
+      setCompact(window.innerWidth < 900);
+      setNarrow(window.innerWidth < 400);
+    };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
@@ -182,6 +188,19 @@ export function Desktop({
     if (app && step) notify({ app, title: "Next step", body: step, sticky: true });
   }, [view, notify]);
 
+  // A Handbook note that unlocks during play gets a banner; notes open on load do not.
+  const handbookSeen = useRef<number | null>(null);
+  useEffect(() => {
+    if (!view) return;
+    const entries = view.handbook.entries;
+    const seen = handbookSeen.current;
+    handbookSeen.current = entries.length;
+    if (seen === null || entries.length <= seen) return;
+    for (const entry of entries.slice(seen)) {
+      notify({ app: "handbook", title: "New in the Handbook", body: entry.name });
+    }
+  }, [view, notify]);
+
   // On the first view, mail that already arrived in an earlier visit is not replayed.
   useEffect(() => {
     if (!view || delivered) return;
@@ -254,6 +273,8 @@ export function Desktop({
         return <CallApp view={view} busy={busy} send={send} />;
       case "notes":
         return <NotesApp view={view} busy={busy} send={send} />;
+      case "handbook":
+        return <HandbookApp view={view} />;
       case "cody":
         return <CodyApp view={view} busy={busy} send={send} onOpenReview={() => openApp("review")} />;
       case "review":
@@ -307,7 +328,7 @@ export function Desktop({
 
       <ProjectWidget view={view} onOpenApp={openApp} />
 
-      {DOCK.map((app) => {
+      {dockFor(view).map((app) => {
         const state = windows[app];
         if (!state?.open) return null;
         // Keep minimised apps mounted so their unsubmitted drafts survive.
@@ -345,7 +366,7 @@ export function Desktop({
         {/* No overflow clipping here: bouncing icons, badges and tooltips rise above the bar.
             Six compact icons fit a 320px screen with the smaller gap. */}
         <ul className="flex items-end gap-1.5 rounded-[22px] border border-white/40 bg-white/30 px-2.5 pb-1.5 pt-2 shadow-2xl backdrop-blur-2xl sm:gap-2">
-          {DOCK.map((app) => {
+          {dockFor(view).map((app) => {
             const running = windows[app]?.open;
             const badge = app === "mail" ? unreadMail : app === attention ? 1 : 0;
             return (
@@ -361,7 +382,7 @@ export function Desktop({
                   }`}
                 >
                   <span className="pointer-events-none absolute -top-8 hidden whitespace-nowrap rounded-md bg-stone-800/80 px-2 py-0.5 text-[12px] text-white group-hover:block">{appName(app, view)}</span>
-                  <AppIcon app={app} size={compact ? 42 : 50} />
+                  <AppIcon app={app} size={narrow ? 34 : compact ? 42 : 50} />
                   {badge > 0 && (
                     <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3b30] px-1 text-[11px] font-semibold text-white shadow">{badge}</span>
                   )}

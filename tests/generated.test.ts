@@ -27,6 +27,7 @@ import {
   appName,
   appTitle,
   DOCK,
+  dockFor,
   guideFor,
   nextStep,
   reviewRepo,
@@ -38,16 +39,24 @@ const marketingDraft = projectDraftSchema.parse(
   JSON.parse(readFileSync(new URL("../docs/scenarios/examples/marketing-cafe-loyalty.json", import.meta.url), "utf8")),
 );
 
+// A statistics mission for a nursing student, written by gemini-3.5-flash; two lines
+// reworded by hand where the client named the concept and a flaw explained itself.
+const statisticsDraft = projectDraftSchema.parse(
+  JSON.parse(readFileSync(new URL("../docs/scenarios/examples/statistics-hand-gel-audit.json", import.meta.url), "utf8")),
+);
+
 function copy(draft: ProjectDraft): ProjectDraft {
   return structuredClone(draft);
 }
 
-test("the worked example and a real generated draft pass every check", async () => {
+test("the worked example and the real generated drafts pass every check", async () => {
   for (const draft of [harbourClinicDraft, marketingDraft]) {
     const parsed = projectDraftSchema.parse(draft);
     const check = await checkProject(buildScenario(parsed, { id: "fixture" }), parsed);
     assert.deepEqual(check.problems, [], draft.title);
   }
+  const subject = await checkProject(buildScenario(statisticsDraft, { id: "statistics" }), statisticsDraft, { requireConcepts: true });
+  assert.deepEqual(subject.problems, []);
 });
 
 test("a generated project plays through the real runtime to a 10/10 success", async () => {
@@ -191,4 +200,95 @@ test("generated project ids are unguessable and match the table's check", () => 
   assert.equal(ids.size, 200);
   for (const id of ids) assert.match(id, /^gen-[a-z0-9]{12}$/);
   assert.equal(isGeneratedId("harbour-clinic"), false);
+});
+
+test("concepts must be tied to their fact and their flaw, and a subject mission needs them", async () => {
+  const harbour = projectDraftSchema.parse(harbourClinicDraft);
+  const fine = await checkProject(buildScenario(harbour, { id: "fixture" }), harbour, { requireConcepts: true });
+  assert.deepEqual(fine.problems, []);
+
+  const loose = copy(harbourClinicDraft);
+  loose.concepts!.problem.cues = ["photosynthesis", "chlorophyll"];
+  const unlinked = await checkProject(buildScenario(loose, { id: "loose" }), loose);
+  assert.equal(unlinked.problems.some((problem) => problem.includes("isn't in the problem fact")), true);
+  assert.equal(unlinked.problems.some((problem) => problem.includes("isn't in the missesProblem version")), true);
+
+  const missing = await checkProject(buildScenario(marketingDraft, { id: "m" }), marketingDraft, { requireConcepts: true });
+  assert.equal(missing.problems.some((problem) => problem.includes("no concepts")), true);
+});
+
+test("Handbook notes unlock with their fact, and all of them by the review", async () => {
+  let state = startProject(harbourClinic);
+  const history: SimulationHistory = [];
+  const take = (step: ProjectStep) => {
+    history.push(...step.events);
+    return step.state;
+  };
+  state = take(chooseAction(harbourClinic, state, "pick-product"));
+  state = take(chooseAction(harbourClinic, state, "call-grace"));
+  assert.deepEqual(projectView(harbourClinic, state, history).handbook, { entries: [], total: 2 });
+
+  state = (await askClient(harbourClinic, state, "Why do the double bookings happen, and when in the morning?", offlineEvaluator)).state;
+  const afterCall = projectView(harbourClinic, state, history).handbook;
+  assert.deepEqual(afterCall.entries.map((entry) => entry.name), ["Race conditions"]);
+  // The fact that unlocks a note is not sent to the browser.
+  assert.equal("fact" in afterCall.entries[0], false);
+
+  for (const question of ["What computer and browser does the front desk have?", "How will you know it's fixed?"]) {
+    state = (await askClient(harbourClinic, state, question, offlineEvaluator)).state;
+  }
+  state = take(endInterview(harbourClinic, state));
+  state = take(await submitRequirements(harbourClinic, state, "No double bookings.", offlineEvaluator));
+  state = take(await submitBrief(harbourClinic, state, "Build the booking board.", offlineEvaluator));
+  const atReview = projectView(harbourClinic, state, history);
+  assert.equal(atReview.stage.id, "review");
+  assert.deepEqual(atReview.handbook.entries.map((entry) => entry.name), ["Race conditions", "Audit trails"]);
+});
+
+test("a project without concepts has no Handbook in the Dock", () => {
+  const plain = projectView(buildScenario(marketingDraft, { id: "gen-plainplain12" }), startProject(buildScenario(marketingDraft, { id: "gen-plainplain12" })), []);
+  assert.equal(dockFor(plain).includes("handbook"), false);
+  const harbour = projectView(harbourClinic, startProject(harbourClinic), []);
+  assert.equal(dockFor(harbour).includes("handbook"), true);
+});
+
+test("a subject mission passes the subject and the learner to the model", async () => {
+  resetModelCooldowns();
+  let prompt = "";
+  const call: ModelCall = async (_model, request) => {
+    prompt = request.prompt;
+    return JSON.stringify(harbourClinicDraft);
+  };
+  const result = await generateProject(
+    { domain: "healthcare", topic: "infection rates on a ward", subject: "statistics", learner: "a second-year nursing student" },
+    { id: "gen-4", call, models: ["fake"] },
+  );
+  assert.equal("error" in result, false);
+  assert.match(prompt, /Subject to learn: statistics/);
+  assert.match(prompt, /The learner: a second-year nursing student/);
+});
+
+test("a flawed walkthrough that explains itself, or a client who names the concept, fails the checks", async () => {
+  const telling = copy(harbourClinicDraft);
+  telling.deliverables.missesRule.demo[1].result = "The appointment disappears because cancelling deletes it.";
+  const told = await checkProject(buildScenario(telling, { id: "tell" }), telling);
+  assert.equal(told.problems.some((problem) => problem.includes("missesRule walkthrough explains its own flaw (because)")), true);
+
+  const naming = copy(harbourClinicDraft);
+  naming.facts.rule.reply = "We need an audit trail: cancelled appointments stay on record for seven years.";
+  const named = await checkProject(buildScenario(naming, { id: "name" }), naming);
+  assert.equal(named.problems.some((problem) => problem.includes('names the "Audit trails" concept')), true);
+});
+
+test("the checks catch a telling summary, a distinctive word of the concept, twin flaws and an uncountable target", async () => {
+  const draft = copy(harbourClinicDraft);
+  draft.deliverables.scopeCreep.summary = "Adds reminders and a waitlist, ignoring the brief's limits.";
+  draft.concepts!.problem.name = "Confounding variables";
+  draft.facts.problem.reply = "That's a confounder, I suppose: the two receptionists save at the same moment.";
+  draft.deliverables.missesRule = structuredClone(draft.deliverables.missesProblem);
+  draft.facts.success.text = "Grace is happy with the new booking system.";
+  const { problems } = await checkProject(buildScenario(draft, { id: "many" }), draft);
+  for (const expected of ["scopeCreep walkthrough explains its own flaw (ignoring)", 'names the "Confounding variables" concept', "make the same mistake", "has no number"]) {
+    assert.equal(problems.some((problem) => problem.includes(expected)), true, expected);
+  }
 });
