@@ -6,7 +6,7 @@ import {
 } from "../src/lib/learning/simulation/schema";
 import { SimulationError, type SimulationHistory } from "../src/lib/learning/simulation/engine";
 import { harbourClinic as scenario } from "../src/lib/projects/harbour-clinic";
-import { offlineEvaluator } from "../src/lib/projects/evaluate";
+import { cueHits, normalise, offlineEvaluator } from "../src/lib/projects/evaluate";
 import {
   askClient,
   chooseAction,
@@ -39,8 +39,8 @@ function track(history: SimulationHistory, step: ProjectStep) {
   return step.state;
 }
 
-// With the keyword grader the standard questions uncover three facts (F1, F3, F6);
-// these uncover the other three, for a thorough call.
+// With the keyword grader the standard questions uncover four facts (F1, F2, F3, F6);
+// these add the other two, for a thorough call.
 const MORE_QUESTIONS = [
   "What do you do with the records when a booking is cancelled?",
   "What computer and browser does reception use?",
@@ -224,14 +224,14 @@ test("a note that catches a concept's flaw is graded on what goes wrong and why"
 });
 
 test("the report says, for each concept, whether it was found, prevented, caught, left out or missed", async () => {
-  // A brief with every constraint: both mistakes are prevented, even the one never asked about.
+  // A brief with every constraint: both mistakes are prevented.
   let run = await throughInterview("pick-product");
   let state = track(run.history, await submitRequirements(scenario, run.state, GOOD_REQUIREMENTS, offlineEvaluator));
   state = track(run.history, await submitBrief(scenario, state, GOOD_BRIEF, offlineEvaluator));
   state = track(run.history, chooseAction(scenario, state, "approve"));
   state = track(run.history, chooseAction(scenario, state, "release-measure"));
   let concepts = projectView(scenario, state, run.history).completion!.concepts;
-  assert.deepEqual(concepts.map((item) => [item.found, item.outcome, item.rating]), [[true, "prevented", "strong"], [false, "prevented", "strong"]]);
+  assert.deepEqual(concepts.map((item) => [item.found, item.outcome, item.rating]), [[true, "prevented", "strong"], [true, "prevented", "strong"]]);
 
   // A brief with neither: the audit-trail flaw comes first and is caught; the fix also
   // covers the race, which nothing ever tested.
@@ -310,9 +310,17 @@ test("a thorough call, a success measure, a measured release and success take tr
   assert.equal(projectView(scenario, state, run.history).completion?.trust.changes.length, 5);
 });
 
+test("a short cue matches whole words, so \"app\" is not found in \"appointment\"", () => {
+  assert.equal(cueHits(normalise("When a patient cancels an appointment"), ["app"]), 0);
+  assert.equal(cueHits(normalise("Is there an app? Which apps do you use?"), ["app"]), 1);
+  assert.equal(cueHits(normalise("The charge nurse logged it in the night log."), ["log"]), 1);
+  assert.equal(cueHits(normalise("Everything was logged"), ["log"]), 1);
+  assert.equal(cueHits(normalise("A cancelled booking"), ["cancel"]), 1);
+});
+
 test("a short call earns no trust bonus", async () => {
   const run = await throughInterview("pick-engineering");
-  assert.equal(memoOf(run.state).interview.revealed.length, 3);
+  assert.equal(memoOf(run.state).interview.revealed.length, 4);
   assert.equal(run.state.variables.trust, 6);
   assert.equal(run.history.at(-1)?.actionId, "end-interview");
 });
