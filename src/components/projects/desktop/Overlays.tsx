@@ -2,7 +2,7 @@
 
 import type { ProjectView } from "@/lib/projects/runtime";
 import { AppIcon, Avatar } from "./icons";
-import { CAST, STEPS, guideFor, stepIndex, type AppId, type Send } from "./config";
+import { CAST_TONE, guideFor, initials, stepIndex, stepsFor, type AppId, type Send } from "./config";
 
 /** Opening sheet: the job, the cast and the choice of role. */
 export function Briefing({ view, busy, send, summary }: { view: ProjectView; busy: boolean; send: Send; summary: string }) {
@@ -15,9 +15,9 @@ export function Briefing({ view, busy, send, summary }: { view: ProjectView; bus
           <p className="mt-2 text-[14px] leading-relaxed text-stone-700">{summary}</p>
         </div>
         <div className="grid gap-3 px-6 py-5 sm:grid-cols-2">
-          {CAST.map((person) => (
+          {view.scenario.cast.map((person) => (
             <div key={person.name} className="flex gap-3 rounded-xl border border-black/10 bg-white p-3">
-              <Avatar initials={person.initials} tone={person.tone} size={40} />
+              <Avatar initials={initials(person.name)} tone={CAST_TONE[person.kind]} size={40} />
               <div className="min-w-0 text-[13px]">
                 <p className="font-semibold text-stone-900">{person.name}</p>
                 <p className="text-stone-500">{person.role}</p>
@@ -27,8 +27,17 @@ export function Briefing({ view, busy, send, summary }: { view: ProjectView; bus
           ))}
         </div>
         <div className="border-t border-black/10 px-6 py-5">
-          <p className="text-[13px] font-semibold text-stone-900">Choose your role</p>
-          <p className="text-[13px] text-stone-600">Same story, two ways in. You can play the other one later.</p>
+          {view.actions.length > 1 ? (
+            <>
+              <p className="text-[13px] font-semibold text-stone-900">Choose your role</p>
+              <p className="text-[13px] text-stone-600">Same story, two ways in. You can play the other one later.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[13px] font-semibold text-stone-900">Your role</p>
+              <p className="text-[13px] text-stone-600">{view.stage.narrative}</p>
+            </>
+          )}
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {view.actions.map((action) => (
               <button
@@ -158,21 +167,24 @@ export function Notifications({ notices, onOpen, onDismiss }: { notices: Notice[
 /** The desktop widget that keeps the learner oriented: budget, trust, steps, guide, log. */
 export function ProjectWidget({ view, onOpenApp }: { view: ProjectView; onOpenApp: (app: AppId) => void }) {
   const current = stepIndex(view);
+  const steps = stepsFor(view);
+  // Generated projects have one way in, so there is no product/tech split to name.
+  const role = view.track === "engineering" ? "Tech lead" : view.scenario.id.startsWith("gen-") ? "Project lead" : "Product lead";
   const { effort, effortMax, trust } = view.meters;
   const guide = guideFor(view);
   return (
     <aside className="absolute right-3 top-10 z-[5] hidden w-72 space-y-3 xl:block">
       <div className="rounded-2xl border border-white/40 bg-white/70 p-4 shadow-lg backdrop-blur-xl">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Harbour Clinic · {view.track === "engineering" ? "Tech lead" : "Product lead"}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{view.scenario.client.organisation} · {role}</p>
         <div className="mt-2 grid grid-cols-2 gap-3 text-[13px]">
           <Meter label="Days used" value={effort} max={effortMax} warn={effort >= effortMax - 2} />
           <Meter label="Client trust" value={trust} max={10} warn={trust <= 3} />
         </div>
       </div>
       <div className="rounded-2xl border border-white/40 bg-white/70 p-4 shadow-lg backdrop-blur-xl">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Steps · {Math.min(current, STEPS.length)} of {STEPS.length}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Steps · {Math.min(current, steps.length)} of {steps.length}</p>
         <ol className="mt-2 space-y-1 text-[13px]">
-          {STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const state = index < current ? "done" : index === current ? "now" : "next";
             return (
               <li key={step.id}>

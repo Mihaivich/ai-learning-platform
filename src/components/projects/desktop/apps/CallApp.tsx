@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProjectView } from "@/lib/projects/runtime";
 import { Avatar } from "../icons";
-import type { Send } from "../config";
+import { firstName, type Send } from "../config";
 
 export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean; send: Send }) {
   const [question, setQuestion] = useState("");
@@ -34,7 +34,7 @@ export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean
     event.preventDefault();
     const text = question.trim();
     if (!text || busy) return;
-    // Clear straight away so the learner can type the next question while Grace answers.
+    // Clear straight away so the learner can type the next question while the client answers.
     setQuestion("");
     setPending(text);
     const ok = await send({ op: "ask", question: text });
@@ -80,7 +80,7 @@ export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean
                 onChange={(event) => setQuestion(event.target.value)}
                 maxLength={500}
                 disabled={asked >= max}
-                placeholder={asked >= max ? "Grace has to go. End the call." : "Ask Grace a question…"}
+                placeholder={asked >= max ? `${firstName(client.name)} has to go. End the call.` : `Ask ${firstName(client.name)} a question…`}
                 className="min-w-0 flex-1 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-stone-100 placeholder:text-stone-400 outline-none focus:border-emerald-400"
               />
               <button type="submit" disabled={busy || !question.trim() || asked >= max} className="rounded-full bg-emerald-500 px-4 py-2 font-medium text-white disabled:opacity-40">
@@ -112,7 +112,7 @@ export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-stone-500">Facts appear here as Grace mentions them.</p>
+          <p className="mt-2 text-stone-500">Facts appear here as {firstName(client.name)} mentions them.</p>
         )}
       </aside>
     </div>

@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import type { ProjectView } from "@/lib/projects/runtime";
-import type { Send } from "../config";
+import { firstName, type Send } from "../config";
 
 /** Notes: the call notes (facts) and the requirements note the learner writes. */
 export function NotesApp({ view, busy, send }: { view: ProjectView; busy: boolean; send: Send }) {
   const writing = view.stage.id === "requirements" && view.status === "active";
+  const client = firstName(view.scenario.client.name);
   const [text, setText] = useState("");
   const [doc, setDoc] = useState<"requirements" | "call">("requirements");
 
   return (
     <div className="flex h-full min-h-0 text-[13px]">
       <nav className="w-44 shrink-0 border-r border-black/10 bg-[#f6f3e8] p-2 max-sm:hidden">
-        <p className="px-2 pb-1 pt-1 text-[11px] font-semibold text-stone-400">Harbour Clinic</p>
+        <p className="px-2 pb-1 pt-1 text-[11px] font-semibold text-stone-400">{view.scenario.client.organisation}</p>
         {[
           { id: "requirements" as const, label: "Requirements", meta: view.requirements ? "Saved" : writing ? "Draft" : "Empty" },
           { id: "call" as const, label: "Call notes", meta: `${view.notes.length} facts` },
@@ -45,7 +46,7 @@ export function NotesApp({ view, busy, send }: { view: ProjectView; busy: boolea
                 {view.notes.map((note) => <li key={note}>{note}</li>)}
               </ul>
             ) : (
-              <p className="mt-3 text-stone-500">Nothing yet. Facts from your call with Grace land here.</p>
+              <p className="mt-3 text-stone-500">Nothing yet. Facts from your call with {client} land here.</p>
             )}
           </>
         ) : view.requirements ? (
@@ -63,7 +64,7 @@ export function NotesApp({ view, busy, send }: { view: ProjectView; busy: boolea
           >
             <label htmlFor="requirements-note" className="text-xl font-bold text-stone-900">Requirements</label>
             <p className="mt-1 text-stone-600">
-              What must the booking board do, what must it never do, and how will you know it worked? Use what Grace told you.
+              What must {view.scenario.words.deliverable} do, what must it never do, and how will you know it worked? Use what {client} told you.
             </p>
             <textarea
               id="requirements-note"
@@ -82,7 +83,7 @@ export function NotesApp({ view, busy, send }: { view: ProjectView; busy: boolea
             </div>
           </form>
         ) : (
-          <p className="text-stone-500">You&apos;ll write the requirements after the call with Grace.</p>
+          <p className="text-stone-500">You&apos;ll write the requirements after the call with {client}.</p>
         )}
       </div>
     </div>

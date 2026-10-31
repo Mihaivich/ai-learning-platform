@@ -65,7 +65,9 @@ Counts: exactly 3 vagueReplies; exactly 3 demo steps per deliverable; 4 to 12 cu
 
 All people and organisations are fictional.
 
-Here is a complete example draft at the quality expected. Match its specificity and tone, not its subject:
+Here is a complete example draft at the quality expected. Match its specificity and tone, not its subject or its sentences:
+write every line fresh for the new job, in the new client's own voice. Never reuse or lightly reword the example's lines
+(such as "It's always the morning rush" or "an app like the big clinics have").
 ${JSON.stringify(harbourClinicDraft)}`;
 
 /** Generation is rare, so it starts with a stronger model, then falls back to the play-time chain. */

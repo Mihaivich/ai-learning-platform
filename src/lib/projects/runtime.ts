@@ -306,6 +306,10 @@ export type ProjectView = {
     title: string;
     summary: string;
     client: ProjectScenario["client"];
+    assistant: ProjectScenario["assistant"];
+    cast: ProjectScenario["cast"];
+    words: ProjectScenario["words"];
+    followUps: ProjectScenario["followUps"] | null;
   };
   status: SimulationState["status"];
   track: Track | null;
@@ -517,6 +521,10 @@ export function projectView(
       title: scenario.title,
       summary: scenario.summary,
       client: scenario.client,
+      assistant: scenario.assistant,
+      cast: scenario.cast,
+      words: scenario.words,
+      followUps: scenario.followUps ?? null,
     },
     status: state.status,
     track,
