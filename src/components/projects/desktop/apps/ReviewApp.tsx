@@ -10,9 +10,13 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
   const reviewing = view.stage.id === "review" && view.status === "active";
   const [picked, setPicked] = useState<{ path: string; line: number } | null>(null);
   const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
   const engineering = view.track === "engineering";
   const agent = view.scenario.assistant.name;
   const approve = view.actions.find((action) => action.id === "approve");
+  // Where the job has Handbook ideas, a change request explains itself, as a real one would.
+  const needsNote = view.handbook.total > 0;
+  const ready = (engineering ? Boolean(picked) : Boolean(reason)) && (!needsNote || note.trim().length >= 15);
 
   if (!work) {
     return <p className="grid h-full place-items-center p-6 text-[13px] text-stone-400">Nothing to review yet. {agent}&apos;s work appears here.</p>;
@@ -104,7 +108,14 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
             <p className="font-semibold text-stone-900">Your change requests</p>
             <ul className="mt-1 space-y-0.5 text-stone-700">
               {work.reviews.map((review, index) => (
-                <li key={index}>{review.label}: {review.correct ? `${agent} fixed it and updated the work.` : `${agent} found nothing to change.`}</li>
+                <li key={index}>
+                  {review.label}: {review.correct ? `${agent} fixed it and updated the work.` : `${agent} found nothing to change.`}
+                  {review.explained && (
+                    <p className={`mt-1 rounded-md px-2.5 py-1.5 ${review.explained.rating === "strong" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
+                      {review.explained.feedback}
+                    </p>
+                  )}
+                </li>
               ))}
             </ul>
           </div>
@@ -125,17 +136,33 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
                 </div>
               </fieldset>
             )}
+            {needsNote && (
+              <label className="mb-3 block">
+                <span className="font-medium text-stone-900">Your note for {agent}</span>
+                <span className="block text-stone-500">What goes wrong, and why? {agent} learns from the why.</span>
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="This breaks when… because…"
+                  className="mt-1.5 w-full resize-none rounded-md border border-black/15 px-2.5 py-1.5 text-stone-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </label>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={busy || (engineering ? !picked : !reason)}
+                disabled={busy || !ready}
                 onClick={async () => {
+                  const explanation = needsNote ? note.trim() : undefined;
                   const ok = engineering
-                    ? picked && (await send({ op: "request-changes", path: picked.path, line: picked.line }))
-                    : await send({ op: "request-changes", reasonId: reason });
+                    ? picked && (await send({ op: "request-changes", path: picked.path, line: picked.line, explanation }))
+                    : await send({ op: "request-changes", reasonId: reason, explanation });
                   if (ok) {
                     setPicked(null);
                     setReason("");
+                    setNote("");
                   }
                 }}
                 className="rounded-md border border-black/15 bg-white px-3 py-1.5 font-medium text-stone-800 shadow-sm disabled:opacity-40"

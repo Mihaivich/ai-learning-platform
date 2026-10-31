@@ -10,7 +10,7 @@ export type Op =
   | { op: "end-interview" }
   | { op: "requirements"; text: string }
   | { op: "brief"; text: string }
-  | { op: "request-changes"; reasonId?: string; path?: string; line?: number };
+  | { op: "request-changes"; reasonId?: string; path?: string; line?: number; explanation?: string };
 
 export type Send = (op: Op) => Promise<boolean>;
 
@@ -176,7 +176,7 @@ export function guideFor(view: ProjectView): string[] {
       return product
         ? [
             `Watch ${agent}'s walkthrough in Review as if you were ${client}.`,
-            ...(view.handbook.total ? ["The Handbook explains the ideas this job depends on. Check the work against them."] : []),
+            ...(view.handbook.total ? ["The Handbook explains the ideas this job depends on. Check the work against them, and when you send it back, say why it goes wrong."] : []),
             "If something would hurt the client, send it back with the reason. A wrong reason costs a day.",
             "Approve when you're satisfied.",
           ]
