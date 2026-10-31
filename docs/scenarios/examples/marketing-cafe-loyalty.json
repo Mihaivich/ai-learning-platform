@@ -1,0 +1,429 @@
+{
+  "title": "Bean & Bread loyalty card",
+  "tagline": "Lead a two-week job with an AI client, an AI marketing agent and a real deadline.",
+  "summary": "A neighbourhood café wants a digital loyalty scheme to boost repeat customers. You lead the job: discover why morning queues are stalling, guide the AI marketing agent, review the campaign build and decide how to launch it.",
+  "domain": "marketing",
+  "learnerRole": "You lead the job for a boutique marketing studio.",
+  "client": {
+    "name": "Marco Vance",
+    "role": "Owner",
+    "organisation": "Bean & Bread Café",
+    "persona": "Marco Vance, owner of Bean & Bread Café. Passionate about coffee, friendly, and easily distracted by trends. Speaks enthusiastically about big brands like Starbucks. Describes solutions ('we need a mobile app store download') rather than problems unless asked targeted questions."
+  },
+  "assistant": {
+    "name": "Nova",
+    "kind": "AI marketing agent"
+  },
+  "manager": {
+    "name": "Elena",
+    "note": "We can give Bean & Bread two weeks of work maximum. Nova is available if you want to use it. Keep me updated on progress."
+  },
+  "user": {
+    "from": "Chloe (Shift Supervisor)",
+    "subject": "Morning rush bottlenecks on counter 1",
+    "body": "The 8:00 AM line reached the front door today. We lost at least 10 regulars who walked away because typing phone numbers for paper-card points takes almost a minute per customer."
+  },
+  "clientEmail": {
+    "subject": "Can you make us a loyalty app?",
+    "body": "Hi team,\n\nWe see all the big coffee chains with their fancy loyalty apps and we want one too! Our customers love our espresso, but we want a digital rewards app to keep them coming back. Can we start this week?\n\nBest,\nMarco"
+  },
+  "firstMoves": {
+    "call": "Schedule a call with Marco before scoping any work",
+    "delegate": {
+      "label": "Ask Nova to start designing a mobile app store loyalty app immediately",
+      "feedback": "You delegated before clarifying requirements. Nova spent three days building screens for an app store submission that Bean & Bread cannot use."
+    },
+    "quote": {
+      "label": "Send Marco a quote for a custom iOS and Android loyalty app",
+      "feedback": "You quoted for the requested solution without knowing the business context. Marco feels the price is high and requests a call anyway."
+    }
+  },
+  "interview": {
+    "opening": "Thanks for hopping on! So, can you build us a loyalty app like the big coffee chains have? What do you need to know from me?",
+    "vagueReplies": [
+      "I just want our customers to feel special and get rewards easily.",
+      "We really need something modern that looks great on a smartphone.",
+      "Honestly, as long as our regulars buy more coffee, I'm open to ideas."
+    ]
+  },
+  "facts": {
+    "problem": {
+      "text": "Baristas manually typing customer phone numbers into the POS creates queues during the 7:40 AM to 8:40 AM peak, causing customer walkouts.",
+      "reply": "During our 7:40 to 8:40 morning peak, baristas have to type a 10-digit phone number into the POS screen for every customer claiming points. The queue stalls, and we see people walk out every day.",
+      "cues": [
+        "stall",
+        "queue",
+        "rush",
+        "phone number",
+        "walkout",
+        "slow",
+        "checkout time",
+        "manual entry",
+        "delay",
+        "morning peak"
+      ],
+      "sampleQuestion": "Why do queues stall during the morning peak rush?"
+    },
+    "rule": {
+      "text": "Customer contact details collected for loyalty must not receive promotional SMS without explicit opt-in consent.",
+      "reply": "Our lawyer was very strict about privacy rules: we can't send promotional SMS messages to customers unless they check an explicit opt-in box during registration.",
+      "cues": [
+        "consent",
+        "opt-in",
+        "promotional sms",
+        "privacy",
+        "gdpr",
+        "export",
+        "permission",
+        "marketing text"
+      ],
+      "sampleQuestion": "What consent rules apply to sending promotional SMS to customers?"
+    },
+    "scope": {
+      "text": "In-store QR stamp web page only; app store downloads and automated SMS campaigns are out of scope. Budget is two weeks.",
+      "reply": "We only have budget for two weeks of your time. Elena mentioned that too. We just need an in-store web QR card—no app store downloads or complex automated email sequences for now.",
+      "cues": [
+        "budget",
+        "custom app",
+        "out of scope",
+        "in-store only",
+        "app store",
+        "web page",
+        "campaigns",
+        "limit"
+      ],
+      "sampleQuestion": "What is the project budget and is a custom app out of scope?"
+    },
+    "detail": {
+      "text": "Loyalty points earn rate is 1 point per dollar spent on beverages only; food items do not earn points.",
+      "reply": "Points are earned on drinks only: 1 point per dollar spent on hot and cold beverages. Food pastries and beans don't count towards loyalty.",
+      "cues": [
+        "beverage",
+        "food items",
+        "points rate",
+        "dollar spent",
+        "earn rate",
+        "drinks only",
+        "per dollar"
+      ],
+      "sampleQuestion": "Do food items earn loyalty points per dollar spent or is it drinks only?"
+    },
+    "environment": {
+      "text": "The café uses an old iPad Air running Square POS web browser at the counter with spotty Wi-Fi.",
+      "reply": "We run our counter on an older iPad Air using the Square POS browser. The Wi-Fi behind the counter drops occasionally, so whatever we use must load instantly.",
+      "cues": [
+        "ipad air",
+        "square pos",
+        "front counter",
+        "wifi",
+        "terminal",
+        "browser",
+        "hardware",
+        "connection"
+      ],
+      "sampleQuestion": "What square pos terminal or browser hardware does the front counter use?"
+    },
+    "success": {
+      "text": "Success means at least 150 loyalty redemptions per week while keeping checkout times under 30 seconds.",
+      "reply": "If we hit 150 redemptions a week while keeping checkout times under 30 seconds per transaction, I'd consider this job a huge win.",
+      "cues": [
+        "redemptions",
+        "target",
+        "per week",
+        "checkout time",
+        "seconds",
+        "metric",
+        "goal",
+        "measure"
+      ],
+      "sampleQuestion": "What is the target metric for loyalty redemptions per week and checkout time?"
+    }
+  },
+  "requirements": {
+    "problem": {
+      "label": "Eliminate manual phone typing at checkout to prevent morning rush delays",
+      "cues": [
+        [
+          "stall",
+          "queue",
+          "rush",
+          "slow",
+          "checkout time",
+          "delay"
+        ],
+        [
+          "phone number",
+          "manual entry",
+          "qr",
+          "fast",
+          "scan"
+        ]
+      ]
+    },
+    "rule": {
+      "label": "Require explicit opt-in consent before sending promotional SMS to customers",
+      "cues": [
+        [
+          "consent",
+          "opt-in",
+          "gdpr",
+          "privacy"
+        ],
+        [
+          "sms",
+          "text",
+          "promotional",
+          "marketing"
+        ]
+      ]
+    },
+    "scope": {
+      "label": "In-store QR web wallet card only; no custom app store app or SMS automation",
+      "cues": [
+        [
+          "in-store",
+          "web",
+          "staff",
+          "qr",
+          "no app"
+        ],
+        [
+          "no app store",
+          "out of scope",
+          "budget",
+          "only"
+        ]
+      ]
+    },
+    "success": {
+      "label": "Target: 150 redemptions per week with checkout times under 30 seconds",
+      "cues": [
+        [
+          "150",
+          "redemption",
+          "redemptions"
+        ],
+        [
+          "per week",
+          "weekly",
+          "seconds",
+          "30 seconds",
+          "checkout time"
+        ]
+      ]
+    },
+    "environment": {
+      "label": "Compatible with the front counter iPad Air browser running Square POS",
+      "cues": [
+        [
+          "ipad",
+          "square pos",
+          "browser"
+        ],
+        [
+          "wifi",
+          "counter",
+          "terminal"
+        ]
+      ]
+    }
+  },
+  "constraints": {
+    "problem": {
+      "label": "Use customer-facing QR scanning so baristas do not manually enter phone numbers at checkout",
+      "cues": [
+        [
+          "qr",
+          "scan",
+          "quick",
+          "instant",
+          "fast",
+          "speed"
+        ],
+        [
+          "phone number",
+          "no typing",
+          "manual entry",
+          "queue",
+          "checkout"
+        ]
+      ]
+    },
+    "rule": {
+      "label": "Keep promotional SMS opt-in unchecked by default and demand explicit user consent",
+      "cues": [
+        [
+          "opt-in",
+          "consent",
+          "permission"
+        ],
+        [
+          "sms",
+          "text",
+          "promotional",
+          "export"
+        ]
+      ]
+    },
+    "scope": {
+      "label": "Limit work to the web QR stamp card; do not build native app downloads or auto-campaign tools",
+      "cues": [
+        [
+          "only",
+          "just",
+          "no",
+          "not",
+          "out of scope"
+        ],
+        [
+          "app store",
+          "native app",
+          "automated sms",
+          "paid ads",
+          "scope"
+        ]
+      ]
+    }
+  },
+  "deliverables": {
+    "good": {
+      "title": "Web-based QR loyalty card system",
+      "summary": "Delivers an in-store web pass with instant camera QR scanning at the counter. Registration requires explicit opt-in for marketing texts. Fast client-side caching ensures quick loading on the counter iPad Air.",
+      "demo": [
+        {
+          "action": "Chloe scans a customer's phone QR code during peak 8:00 AM rush.",
+          "result": "Points register instantly in 2 seconds without typing any numbers."
+        },
+        {
+          "action": "A new customer registers their pass on their own phone.",
+          "result": "The promotional SMS checkbox is unchecked by default and requires explicit opt-in."
+        },
+        {
+          "action": "Marco tests the system on the counter iPad Air via Square POS browser.",
+          "result": "The web app loads immediately and functions smoothly over café Wi-Fi."
+        }
+      ]
+    },
+    "missesProblem": {
+      "title": "Web-based QR loyalty card system",
+      "summary": "Delivers a loyalty web portal where customers show a profile number. Baristas type the customer's 10-digit phone number into the POS form to issue points.",
+      "demo": [
+        {
+          "action": "A customer shows their digital profile during morning rush.",
+          "result": "Chloe manually types the customer's 10-digit phone number into the screen form."
+        },
+        {
+          "action": "Three customers line up at 8:15 AM to claim loyalty points.",
+          "result": "Manual entry takes 45 seconds per order, causing the queue to spill out the doorway."
+        },
+        {
+          "action": "A new customer signs up for the digital pass.",
+          "result": "Marketing SMS requires explicit opt-in confirmation."
+        }
+      ]
+    },
+    "missesRule": {
+      "title": "Web-based QR loyalty card system",
+      "summary": "Delivers an instant QR loyalty card. To maximize subscriber reach, all customer phone numbers are automatically enrolled into promotional SMS campaigns.",
+      "demo": [
+        {
+          "action": "Chloe scans a customer's phone QR code during peak rush.",
+          "result": "Points register instantly in 2 seconds."
+        },
+        {
+          "action": "A customer registers their web card to save their points.",
+          "result": "Their phone number is saved and auto-subscribed to weekly promotional marketing texts without an opt-in prompt."
+        },
+        {
+          "action": "Marco reviews customer profile logs in the admin console.",
+          "result": "Over 200 phone numbers are queued for broadcast texts without explicit consent records."
+        }
+      ]
+    },
+    "scopeCreep": {
+      "title": "Native loyalty app & SMS marketing suite",
+      "summary": "Delivers native iOS and Android app store builds, an automated SMS promotional campaign engine, and a customer push notification system alongside the counter QR scanner.",
+      "demo": [
+        {
+          "action": "Chloe scans a customer's QR code at the register.",
+          "result": "Points add instantly in under 3 seconds."
+        },
+        {
+          "action": "Marco opens the admin panel to view the system.",
+          "result": "An automated SMS campaign wizard and App Store submission dashboard are visible."
+        },
+        {
+          "action": "Marco checks project progress against the two-week schedule.",
+          "result": "App store review delays have pushed the project launch back by three weeks."
+        }
+      ]
+    }
+  },
+  "reviewReasons": {
+    "problem": "Baristas still have to manually type phone numbers at checkout",
+    "rule": "It enrolls customers into promotional SMS without explicit consent",
+    "scope": "It includes app store builds and automated SMS campaign engines",
+    "distractor": "The digital stamp card icon uses green instead of warm coffee brown"
+  },
+  "release": {
+    "measured": {
+      "label": "Launch at counter and track redemptions and checkout times for two weeks",
+      "feedback": "You launch the web card and set up a weekly counter to track redemptions and transaction speed against Marco's goals."
+    },
+    "pilot": {
+      "label": "Run a one-week pilot with Chloe on Counter 1 during morning rush",
+      "feedback": "You take a cautious approach: Chloe tests the QR workflow on Counter 1 during morning peak while other staff observe."
+    },
+    "now": {
+      "label": "Roll out digital loyalty cards across all counter registers on Monday morning",
+      "feedback": "You switch all registers to the new loyalty system on Monday morning."
+    }
+  },
+  "endings": {
+    "success": "Two weeks post-launch, Bean & Bread records 185 weekly redemptions with average checkout times under 22 seconds. Queue drop-offs hit zero, and Marco extends your studio's contract.",
+    "failureProblem": "On Monday morning, typing phone numbers slows line speed to 50 seconds per customer. Queue walkouts increase by 15%, causing upset regulars and lost sales during peak hours.",
+    "failureRule": "A customer receives an unprompted promotional SMS and files a compliance complaint. Marco has to halt the system and explain why customer phone numbers were used without consent.",
+    "partialProblem": "During the pilot shift, manual phone typing stalls Chloe's line. The pilot reveals the flaw before full rollout, but fixing the interface delays final completion by a week.",
+    "partialRule": "During Chloe's pilot shift, a customer notices auto-enrollment for promotional texts. You catch the missing opt-in step early, but fixing consent workflows pushes launch past the budget.",
+    "partialOther": "The loyalty web card runs smoothly, but because no metrics were tracked against baseline targets, Marco cannot prove if repeat customer visits improved."
+  },
+  "debrief": {
+    "missedFact": {
+      "problem": "You didn't ask why morning queues stall. The bottleneck came from manual phone entry, which required QR scanning to solve.",
+      "rule": "You didn't ask about SMS messaging rules, missing the legal requirement for explicit customer opt-in consent.",
+      "scope": "You didn't ask about budget or boundaries, risking an expensive app store project when a web card was required.",
+      "success": "You didn't establish success metrics with Marco, leaving no way to verify if transaction speed improved."
+    },
+    "missedRequirement": {
+      "problem": "Your requirements omitted eliminating manual phone entry at checkout.",
+      "rule": "Your requirements didn't specify explicit opt-in consent for promotional SMS.",
+      "scope": "Your requirements failed to keep the system strictly to an in-store web card.",
+      "success": "Your requirements lacked a measurable target for redemptions and checkout speed.",
+      "environment": "Your requirements didn't specify compatibility with the counter iPad Air browser."
+    },
+    "missedConstraint": {
+      "problem": "Your brief didn't instruct Nova to use instant QR scanning, so Nova kept slow manual phone entry.",
+      "rule": "Your brief didn't enforce explicit opt-in consent for SMS marketing, so Nova auto-subscribed phone numbers.",
+      "scope": "Your brief didn't bound the scope, leading Nova to build native apps and marketing automation."
+    }
+  },
+  "trust": {
+    "call": "You called Marco to understand the café's actual operations before proposing solutions.",
+    "quote": "You sent a quote before understanding why morning queues were backing up.",
+    "thorough": "Your questions uncovered the true root cause of morning counter bottlenecks.",
+    "metric": "You agreed on clear metrics with Marco: 150 redemptions per week and sub-30-second checkout times.",
+    "wrongReview": "You rejected Nova's work for an aesthetic detail, delaying the schedule without fixing core functionality.",
+    "measured": "You launched with direct tracking against Marco's transaction speed and redemption goals.",
+    "releaseNow": "You launched across all counters at once without validating checkout speed during a live rush.",
+    "success": "The performance metrics proved that morning queues cleared faster while loyalty redemptions rose.",
+    "failure": "Queue delays degraded customer experience right at the counter during peak morning rush."
+  },
+  "reportNotes": {
+    "scopeKept": "Your brief kept Nova focused strictly on the in-store web QR loyalty card.",
+    "pilot": "You ran a single-counter pilot first, catching workflow issues before impacting all morning customers."
+  },
+  "samples": {
+    "requirements": "Eliminate manual phone entry using QR scanning to prevent morning rush delays and keep checkout time under 30 seconds. Customer registration must require explicit opt-in consent before sending promotional SMS. In-store web card only (no app store app, out of scope). Target: 150 redemptions per week. Must work in Square POS browser on counter iPad Air.",
+    "brief": "Build an in-store web QR loyalty card for front counter use. Use instant QR scan code readout with no manual phone number typing at checkout. Keep promotional SMS opt-in boxes unchecked by default to ensure explicit consent. Do not build app store downloads or automated SMS campaigns—web card only."
+  }
+}

@@ -162,6 +162,23 @@ Vercel's Hobby plan only deploys commits by members of the Vercel team, so merge
 3. Add the scenario module under `src/lib/projects/` and register it in `src/lib/projects/index.ts`. Its `trust` section gives the reason shown in the report for each action that changes trust, and the change for each outcome.
 4. Add tests in `tests/projects.test.ts` that reach each ending.
 
+## Generating a project
+
+AI can write a new project for any domain, inside the same fixed structure, so a generated project is as fair and gradeable as a hand-written one. The pipeline is in `src/lib/projects/generated/`:
+
+1. **Draft** (`draft.ts`): the AI writes content only. That's the client, the six facts with named roles (problem, rule, scope, detail, environment, success), the requirements and brief constraints, a good deliverable and three flawed ones, the review reasons, release options, endings and report sentences. It never chooses stages, effects or endings.
+2. **Build** (`build.ts`): the draft is wired into Harbour Clinic's game structure, using the product track (review a walkthrough and send it back with a reason).
+3. **Check** (`validate.ts`): the engine's consistency check, then the keyword fallback. Every fact must be reachable and the sample answers must cover every checklist item. Then automatic playthroughs: the perfect path must reach success at trust 10, and every flawed version must fail on a full release, be caught by a pilot and be fixed when sent back for the right reason.
+4. **Generate** (`generate.ts`): asks `gemini-3.5-flash` first, then the play-time chain, with Harbour Clinic as the worked example (`draft-example.ts`). A draft that fails its checks goes back to the model once, with the problems.
+
+To try it from the command line:
+
+```bash
+npm run generate:project -- "marketing" "a loyalty programme for a neighbourhood café" draft.json
+```
+
+A generation takes about a minute. `docs/scenarios/examples/` keeps a real generated draft, which the tests check. Generated projects can't be played in the app yet; saving them and the desktop's wording for other domains come next.
+
 ## Scripts
 
 | Command | What it does |
@@ -171,3 +188,4 @@ Vercel's Hobby plan only deploys commits by members of the Vercel team, so merge
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint |
 | `npm run test:postgres` | Apply the migrations to a local Postgres and check the policies |
+| `npm run generate:project -- "<domain>" "<topic>" [out.json]` | Generate and check a project draft |

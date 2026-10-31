@@ -25,6 +25,8 @@ export function MailApp({
 }) {
   const open = mails.find((mail) => mail.id === selected) ?? null;
   const deciding = view.stage.id === "inbox" && view.status === "active";
+  // The client's first email carries the first-move choices.
+  const decisionMail = view.inbox[0]?.id;
 
   return (
     <div className="flex h-full min-h-0 text-[13px]">
@@ -75,7 +77,7 @@ export function MailApp({
             </div>
             <p className="mt-4 whitespace-pre-line text-[14px] leading-relaxed text-stone-800">{open.body}</p>
 
-            {deciding && open.id === "grace-email" && (
+            {deciding && open.id === decisionMail && (
               <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
                 <p className="font-semibold text-stone-900">How do you respond?</p>
                 <p className="mt-0.5 text-stone-600">Your first move sets the tone with the client. There&apos;s no undo.</p>
@@ -94,8 +96,8 @@ export function MailApp({
                 </div>
               </div>
             )}
-            {deciding && open.id !== "grace-email" && (
-              <p className="mt-6 text-stone-500">Read everything, then reply to Grace&apos;s email.</p>
+            {deciding && open.id !== decisionMail && (
+              <p className="mt-6 text-stone-500">Read everything, then reply to {view.scenario.client.name.split(" ")[0]}&apos;s email.</p>
             )}
           </div>
         ) : (

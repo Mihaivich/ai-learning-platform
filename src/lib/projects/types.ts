@@ -85,6 +85,17 @@ export type ProjectScenario = {
   tagline: string;
   summary: string;
   client: { name: string; role: string; organisation: string; persona: string };
+  /** The AI teammate who builds the work ("Cody, AI coding agent"). */
+  assistant: { name: string; kind: string };
+  /** Scenario-specific sentences in the report, where the runtime has no generic wording. */
+  reportNotes: {
+    /** Delegation: the brief kept the assistant to the agreed scope. */
+    scopeKept: string;
+    /** Diligence: the learner ran a pilot first. */
+    pilot: string;
+    /** Diligence, engineering track: the brief asked for a test. */
+    testAsked?: string;
+  };
   facts: ProjectFact[];
   inbox: InboxMessage[];
   interview: {
