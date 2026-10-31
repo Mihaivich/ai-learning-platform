@@ -93,6 +93,25 @@ export function rateLimitCooldown(error: unknown, now: number): number | null {
 }
 
 /**
+ * The schema as Gemini accepts it. Gemini supports a subset of JSON Schema: the
+ * meta-schema URL isn't part of it, and array counts (minItems, maxItems) in a
+ * large schema make it reject the request. Counts stay enforced, because the
+ * answer is still parsed with the full zod schema.
+ */
+export function toGeminiSchema(schema: z.ZodType): Record<string, unknown> {
+  const strip = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(strip);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => key !== "$schema" && key !== "minItems" && key !== "maxItems")
+        .map(([key, item]) => [key, strip(item)]),
+    );
+  };
+  return strip(z.toJSONSchema(schema)) as Record<string, unknown>;
+}
+
+/**
  * Asks each model in turn for JSON matching the schema. Returns the parsed data
  * and the model that produced it, or null when no model gave a valid answer.
  */
@@ -103,9 +122,7 @@ export async function generateJsonFromChain<T extends z.ZodType>(
   const models = options.models ?? modelChain();
   const call = options.call ?? callGemini;
   const now = options.now ?? Date.now;
-  // Gemini supports a subset of JSON Schema; the meta-schema URL isn't part of it.
-  const jsonSchema: Record<string, unknown> = { ...z.toJSONSchema(request.schema) };
-  delete jsonSchema.$schema;
+  const jsonSchema = toGeminiSchema(request.schema);
 
   for (const model of models) {
     if ((cooldownUntil.get(model) ?? 0) > now()) continue;
@@ -113,7 +130,8 @@ export async function generateJsonFromChain<T extends z.ZodType>(
       const text = await call(model, { ...request, jsonSchema }, AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS));
       const parsed = request.schema.safeParse(JSON.parse(text ?? ""));
       if (parsed.success) return { data: parsed.data, model };
-      console.warn(`Gemini ${model} returned JSON that does not match the schema.`);
+      const issues = parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
+      console.warn(`Gemini ${model} returned JSON that does not match the schema: ${issues.join("; ")}`);
     } catch (error) {
       const rest = rateLimitCooldown(error, now());
       if (rest !== null) cooldownUntil.set(model, now() + rest);

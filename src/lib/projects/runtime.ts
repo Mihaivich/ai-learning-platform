@@ -149,7 +149,7 @@ export async function askClient(
   const memo = memoOf(state);
   const asked = memo.interview.turns.filter((turn) => turn.role === "learner").length;
   if (asked >= scenario.interview.maxQuestions) {
-    throw new SimulationError("Grace has to get back to her patients. End the call.");
+    throw new SimulationError(`${scenario.client.name.split(" ")[0]} has to go. End the call.`);
   }
   const answer = await evaluator.interview({
     scenario,
@@ -230,7 +230,7 @@ export async function submitBrief(
   writing: unknown,
   evaluator: ProjectEvaluator,
 ): Promise<ProjectStep> {
-  requireStage(state, "brief", "Cody already has your brief.");
+  requireStage(state, "brief", `${scenario.assistant.name} already has your brief.`);
   const text = cleanText(writing, MAX_WRITING, "brief");
   const track = trackOf(state);
   const items = itemsFor(scenario.brief, track);
@@ -263,7 +263,7 @@ export function requestChanges(
 ): ProjectStep {
   requireStage(state, "review", "There's nothing to review right now.");
   const variant = currentVariant(scenario, state);
-  if (!variant) throw new SimulationError("Cody hasn't delivered anything yet.", 409);
+  if (!variant) throw new SimulationError(`${scenario.assistant.name} hasn't delivered anything yet.`, 409);
   const track = trackOf(state);
   let correct = false;
   const review: ProjectMemo["reviews"][number] = { variant: variant.id, correct };
@@ -365,23 +365,24 @@ export function projectCards(
   const memo = memoOf(state);
   const track = trackOf(state);
   const chosen = (id: string) => history.some((event) => event.actionId === id);
+  const agent = scenario.assistant.name;
   const briefCovered = memo.brief?.covered ?? [];
   const reqCovered = memo.requirements?.covered ?? [];
 
-  // Delegation: what you found out first, and what you kept Cody away from.
+  // Delegation: what you found out first, and what you kept the assistant away from.
   const delegation: string[] = [];
   let delegationScore = 0;
   if (chosen("call-grace")) {
     delegationScore++;
-    delegation.push("You talked to the client before handing anything to Cody.");
+    delegation.push(`You talked to the client before handing anything to ${agent}.`);
   } else if (chosen("cody-starts")) {
-    delegation.push("You asked Cody to build before anyone knew what to build. Two days were thrown away.");
+    delegation.push(`You asked ${agent} to build before anyone knew what to build. Two days were thrown away.`);
   } else {
     delegation.push("You replied with a quote for what the client asked for, without checking what she needed.");
   }
   if (briefCovered.includes("C3")) {
     delegationScore++;
-    delegation.push("Your brief kept Cody to the staff booking board.");
+    delegation.push(scenario.reportNotes.scopeKept);
   } else {
     delegation.push(scenario.debriefNotes.missedConstraint.C3);
   }
@@ -420,10 +421,10 @@ export function projectCards(
   let discernmentScore = 0;
   if (first === "good") {
     discernmentScore = wrongRequests ? 1 : 2;
-    discernment.push("Cody's first delivery was correct, and you approved it.");
+    discernment.push(`${agent}'s first delivery was correct, and you approved it.`);
   } else if (fixed && shipped === "good") {
     discernmentScore = 2;
-    discernment.push("You spotted what was wrong with Cody's work and sent it back for the right reason.");
+    discernment.push(`You spotted what was wrong with ${agent}'s work and sent it back for the right reason.`);
   } else {
     discernment.push(
       track === "engineering"
@@ -448,7 +449,7 @@ export function projectCards(
   }
   if (track === "engineering") {
     if (briefCovered.includes("C4")) {
-      diligence.push("You asked Cody for a test of simultaneous bookings.");
+      diligence.push(scenario.reportNotes.testAsked ?? `You asked ${agent} for a test.`);
     } else {
       diligence.push(scenario.debriefNotes.missedConstraint.C4);
     }
@@ -459,7 +460,7 @@ export function projectCards(
     diligence.push("You released with a weekly count against the target.");
   } else if (release === "pilot") {
     diligenceScore++;
-    diligence.push("You piloted with one receptionist first, which limits the damage of anything you missed.");
+    diligence.push(scenario.reportNotes.pilot);
   } else if (release === "plain") {
     diligence.push("You switched everyone over at once with no way to tell whether it worked.");
   }

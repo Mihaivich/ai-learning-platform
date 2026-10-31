@@ -98,6 +98,12 @@ export const harbourClinic: ProjectScenario = {
     persona:
       "Grace Wong, practice manager at Harbour Family Clinic, a small family clinic. Friendly, busy and not technical. Speaks in short, natural sentences, sometimes mentions patients or staff by name. Cares about the budget and about not upsetting patients. Describes solutions ('an app like the big clinics') rather than problems unless asked good questions.",
   },
+  assistant: { name: "Cody", kind: "AI coding agent" },
+  reportNotes: {
+    scopeKept: "Your brief kept Cody to the staff booking board.",
+    pilot: "You piloted with one receptionist first, which limits the damage of anything you missed.",
+    testAsked: "You asked Cody for a test of simultaneous bookings.",
+  },
   facts: [
     {
       id: "F1",

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:postgres": "bash scripts/verify-review-fixes.sh"
+    "test:postgres": "bash scripts/verify-review-fixes.sh",
+    "generate:project": "node --env-file=.env.local --import tsx scripts/generate-project.ts"
   },
   "dependencies": {
     "@google/genai": "^2.30.0",
