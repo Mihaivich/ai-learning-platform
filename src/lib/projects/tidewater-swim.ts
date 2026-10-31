@@ -1,4 +1,5 @@
-import { buildScenario } from "./generated/build";
+import { buildScenario, type EngineeringDraft } from "./generated/build";
+import type { CodeFile } from "./types";
 import type { ProjectDraft } from "./generated/draft";
 
 /*
@@ -259,4 +260,167 @@ export const tidewaterSwimDraft: ProjectDraft = {
   },
 };
 
-export const tidewaterSwim = buildScenario(tidewaterSwimDraft, { id: "tidewater-swim" });
+// The tech lead's view: the same versions as pull requests.
+const goodPricing: CodeFile = {
+  path: "src/pricing.ts",
+  lines: [
+    'import { termPrice } from "./prices";',
+    'import type { Child } from "./types";',
+    "",
+    "const SIBLING_DISCOUNT = 0.2;",
+    "",
+    "// Each child after the first gets 20% off their own term price.",
+    "export function familyTotal(children: Child[]) {",
+    "  return children.reduce((total, child, index) => {",
+    "    const price = termPrice(child.className);",
+    "    return total + (index === 0 ? price : Math.round(price * (1 - SIBLING_DISCOUNT)));",
+    "  }, 0);",
+    "}",
+  ],
+};
+
+const serverCheckout: CodeFile = {
+  path: "src/checkout.ts",
+  lines: [
+    'import { TapPay } from "@tappay/node";',
+    'import { familyTotal } from "./pricing";',
+    'import type { Order } from "./types";',
+    "",
+    "// Runs on the server. The page sends the order here.",
+    "const tapPay = new TapPay(process.env.TAPPAY_SECRET_KEY!);",
+    "",
+    "export async function checkout(order: Order) {",
+    "  const amount = familyTotal(order.children);",
+    "  return tapPay.charge({ amount, card: order.cardToken });",
+    "}",
+  ],
+};
+
+const siblingTest: CodeFile = {
+  path: "tests/sibling.test.ts",
+  lines: [
+    'import { familyTotal } from "../src/pricing";',
+    "",
+    'test("a family of two Juniors pays £216", () => {',
+    '  const boys = [{ className: "juniors" }, { className: "juniors" }];',
+    "  expect(familyTotal(boys)).toBe(21600);",
+    "});",
+  ],
+};
+
+const siblingPassed = { name: "sibling.test.ts", passed: true, detail: "a family of two Juniors pays £216: passed" };
+const oldTestsPassed = { name: "prices.test.ts", passed: true, detail: "40 of 40 price tests: passed" };
+
+const engineering: EngineeringDraft = {
+  test: {
+    label: "Include a test of the sibling discount",
+    cues: [["test", "tests", "testing", "unit test", "spec"]],
+    asked: "You asked Cody for tests, so the pull request showed which prices were checked.",
+    missed: "Your brief didn't ask for tests, so the pull request showed nothing about which prices still hold.",
+    file: siblingTest,
+  },
+  code: {
+    good: { files: [goodPricing, serverCheckout], problemLines: [], checks: [siblingPassed, oldTestsPassed] },
+    missesProblem: {
+      files: [
+        {
+          path: "src/pricing.ts",
+          lines: [
+            'import type { Child } from "./types";',
+            "",
+            "// Term prices in pence, in one table instead of the old price code.",
+            "const TERM_PRICES = {",
+            "  ducklings: 9000,",
+            "  juniors: 12000,",
+            "  squad: 18000,",
+            "};",
+            "",
+            "const SIBLING_DISCOUNT = 0.2;",
+            "",
+            "export function familyTotal(children: Child[]) {",
+            "  return children.reduce((total, child, index) => {",
+            "    const price = TERM_PRICES[child.className];",
+            "    return total + (index === 0 ? price : Math.round(price * (1 - SIBLING_DISCOUNT)));",
+            "  }, 0);",
+            "}",
+          ],
+        },
+        serverCheckout,
+        {
+          path: "tests/pricing.test.ts",
+          lines: [
+            'import { familyTotal } from "../src/pricing";',
+            "",
+            "// Replaces tests/prices.test.ts: its 40 cases were written for the old price code.",
+            'test("one Junior pays the Junior price", () => {',
+            '  expect(familyTotal([{ className: "juniors" }])).toBe(12000);',
+            "});",
+            'test("a second child gets 20% off", () => {',
+            '  expect(familyTotal([{ className: "juniors" }, { className: "juniors" }])).toBe(21600);',
+            "});",
+          ],
+        },
+      ],
+      problemLines: [
+        { path: "src/pricing.ts", line: 3 },
+        { path: "src/pricing.ts", line: 7 },
+        { path: "tests/pricing.test.ts", line: 3 },
+      ],
+      checks: [siblingPassed, { name: "pricing.test.ts", passed: true, detail: "12 of 12 pricing tests: passed" }],
+    },
+    missesRule: {
+      files: [
+        goodPricing,
+        {
+          path: "public/signup.js",
+          lines: [
+            'import { TapPay } from "https://js.tappay.example/v3";',
+            'import { familyTotal } from "./pricing.js";',
+            "",
+            "// Charge straight from the page: one step fewer on phones.",
+            'const tapPay = new TapPay("tp_live_51Hx9QeTidewater8f2c");',
+            "",
+            "export async function payForTerm(order) {",
+            "  const amount = familyTotal(order.children);",
+            "  return tapPay.charge({ amount, card: order.card });",
+            "}",
+          ],
+        },
+      ],
+      problemLines: [
+        { path: "public/signup.js", line: 4 },
+        { path: "public/signup.js", line: 5 },
+      ],
+      checks: [siblingPassed, oldTestsPassed],
+    },
+    scopeCreep: {
+      files: [
+        goodPricing,
+        serverCheckout,
+        {
+          path: "src/accounts.ts",
+          lines: [
+            'import { db, hashPassword } from "./db";',
+            "",
+            "// Parents can create an account and join a waiting list.",
+            "export async function signUp(email: string, password: string) {",
+            '  await db.insert("parents", { email, passwordHash: await hashPassword(password) });',
+            "}",
+            "",
+            "export async function joinWaitingList(parentId: string, className: string) {",
+            '  await db.insert("waiting_list", { parentId, className, joinedAt: new Date() });',
+            "}",
+          ],
+        },
+      ],
+      problemLines: [
+        { path: "src/accounts.ts", line: 3 },
+        { path: "src/accounts.ts", line: 4 },
+        { path: "src/accounts.ts", line: 8 },
+      ],
+      checks: [siblingPassed, oldTestsPassed],
+    },
+  },
+};
+
+export const tidewaterSwim = buildScenario(tidewaterSwimDraft, { id: "tidewater-swim" }, engineering);

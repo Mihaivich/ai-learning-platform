@@ -1,9 +1,10 @@
-import { buildScenario } from "./generated/build";
+import { buildScenario, type EngineeringDraft } from "./generated/build";
+import type { CodeFile } from "./types";
 import type { ProjectDraft } from "./generated/draft";
 
 /*
- * ParcelPal: an API used by phone apps the company doesn't control, for
- * learners heading into engineering jobs. Written as a draft, so the same
+ * ParcelPal: an API used by phone apps the company doesn't control. Written
+ * as a draft, so the same
  * builder and checks as generated projects apply. The agent's flawed versions
  * make retries faster instead of safe, or replace an endpoint old apps use.
  */
@@ -262,4 +263,170 @@ export const parcelPalDraft: ProjectDraft = {
   },
 };
 
-export const parcelPal = buildScenario(parcelPalDraft, { id: "parcelpal" });
+// The tech lead's view: the same versions as pull requests.
+const goodDeliveries: CodeFile = {
+  path: "src/deliveries.ts",
+  lines: [
+    'import { db } from "./db";',
+    'import { chargeShop } from "./billing";',
+    "",
+    "// POST /deliveries/:id/complete keeps its path and fields. Older apps send no key.",
+    "export async function completeDelivery(deliveryId: string, courierId: string, key?: string) {",
+    "  const id = key ?? `${deliveryId}:${courierId}`;",
+    '  const done = await db.findOne("completions", { id });',
+    "  if (done) return done.response;",
+    '  const response = { status: "delivered" };',
+    "  await db.transaction(async (tx) => {",
+    '    await tx.insert("completions", { id, deliveryId, response });',
+    "    await chargeShop(tx, deliveryId);",
+    "  });",
+    "  return response;",
+    "}",
+  ],
+};
+
+const completionsMigration: CodeFile = {
+  path: "migrations/004_completions.sql",
+  lines: [
+    "create table completions (",
+    "  id text primary key,",
+    "  delivery_id text not null references deliveries (id),",
+    "  response jsonb not null,",
+    "  created_at timestamptz not null default now()",
+    ");",
+  ],
+};
+
+const chargeTest: CodeFile = {
+  path: "tests/complete-delivery.test.ts",
+  lines: [
+    'import { chargesFor, sendDelivered } from "./helpers";',
+    "",
+    'test("a delivery sent twice charges the shop once", async () => {',
+    '  await sendDelivered("d-42", { key: "k-1" });',
+    '  await sendDelivered("d-42", { key: "k-1" });',
+    '  expect(await chargesFor("d-42")).toHaveLength(1);',
+    "});",
+  ],
+};
+
+const chargedOnce = { name: "complete-delivery.test.ts", passed: true, detail: "a delivery sent twice charges the shop once: passed" };
+
+const engineering: EngineeringDraft = {
+  test: {
+    label: "Include a test that a repeated delivery is charged once",
+    cues: [["test", "tests", "testing", "unit test", "spec"]],
+    asked: "You asked Cody for a test of a delivery sent twice.",
+    missed: "Your brief didn't ask for a test, so nothing would have caught a second charge before release.",
+    file: chargeTest,
+  },
+  code: {
+    good: { files: [completionsMigration, goodDeliveries], problemLines: [], checks: [chargedOnce] },
+    missesProblem: {
+      files: [
+        {
+          path: "src/deliveries.ts",
+          lines: [
+            'import { db } from "./db";',
+            'import { chargeShop } from "./billing";',
+            "",
+            "// POST /deliveries/:id/complete keeps its path and fields.",
+            "export async function completeDelivery(deliveryId: string) {",
+            '  await db.update("deliveries", deliveryId, { status: "delivered" });',
+            "  await chargeShop(db, deliveryId);",
+            '  return { status: "delivered" };',
+            "}",
+          ],
+        },
+        {
+          path: "app/src/confirm.ts",
+          lines: [
+            'import { api } from "./api";',
+            "",
+            "// Try again sooner: after 2 seconds instead of 10, up to 5 tries.",
+            "export async function confirmDelivered(deliveryId: string) {",
+            "  for (let attempt = 1; attempt <= 5; attempt++) {",
+            "    try {",
+            "      return await api.post(`/deliveries/${deliveryId}/complete`, {}, { timeout: 2000 });",
+            "    } catch {",
+            "      // No answer yet: try again.",
+            "    }",
+            "  }",
+            "}",
+          ],
+        },
+      ],
+      problemLines: [
+        { path: "src/deliveries.ts", line: 6 },
+        { path: "src/deliveries.ts", line: 7 },
+        { path: "app/src/confirm.ts", line: 5 },
+        { path: "app/src/confirm.ts", line: 7 },
+      ],
+      checks: [{ name: "complete-delivery.test.ts", passed: false, detail: "a delivery sent twice charges the shop once: expected 1 charge, received 2" }],
+    },
+    missesRule: {
+      files: [
+        completionsMigration,
+        {
+          path: "src/deliveries.ts",
+          lines: [
+            'import { db } from "./db";',
+            'import { chargeShop } from "./billing";',
+            "",
+            "// Replaces POST /deliveries/:id/complete. Status is now a number: 2 = delivered.",
+            "export async function confirmDelivery(deliveryId: string, key: string) {",
+            '  const done = await db.findOne("completions", { id: key });',
+            "  if (done) return { status: 2 };",
+            "  await db.transaction(async (tx) => {",
+            '    await tx.insert("completions", { id: key, deliveryId, response: { status: 2 } });',
+            "    await chargeShop(tx, deliveryId);",
+            "  });",
+            "  return { status: 2 };",
+            "}",
+          ],
+        },
+        {
+          path: "src/routes.ts",
+          lines: [
+            'import { confirmDelivery } from "./deliveries";',
+            "",
+            "// The courier app now calls the new route; the old one is gone.",
+            'router.post("/v2/deliveries/:id/confirm", (req) => confirmDelivery(req.params.id, req.body.key));',
+          ],
+        },
+      ],
+      problemLines: [
+        { path: "src/deliveries.ts", line: 4 },
+        { path: "src/deliveries.ts", line: 7 },
+        { path: "src/deliveries.ts", line: 12 },
+        { path: "src/routes.ts", line: 3 },
+        { path: "src/routes.ts", line: 4 },
+      ],
+      checks: [chargedOnce],
+    },
+    scopeCreep: {
+      files: [
+        completionsMigration,
+        goodDeliveries,
+        {
+          path: "src/live-map.ts",
+          lines: [
+            'import { db } from "./db";',
+            "",
+            "// Shops can follow every courier on a live map.",
+            "export async function courierPositions(shopId: string) {",
+            '  return db.find("courier_positions", { shopId, since: minutesAgo(5) });',
+            "}",
+          ],
+        },
+      ],
+      problemLines: [
+        { path: "src/live-map.ts", line: 3 },
+        { path: "src/live-map.ts", line: 4 },
+      ],
+      checks: [chargedOnce],
+    },
+  },
+};
+
+export const parcelPal = buildScenario(parcelPalDraft, { id: "parcelpal" }, engineering);

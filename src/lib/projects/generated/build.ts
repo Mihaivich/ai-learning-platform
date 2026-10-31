@@ -5,7 +5,7 @@ import {
   simulationConditionSchema,
   simulationConfigSchema,
 } from "@/lib/learning/simulation/schema";
-import type { ChecklistItem, CodeVariant, ProjectFact, ProjectScenario } from "../types";
+import type { ChecklistItem, CodeFile, CodeVariant, ProjectFact, ProjectScenario } from "../types";
 import type { FactRole, ProjectDraft } from "./draft";
 
 /*
@@ -13,6 +13,8 @@ import type { FactRole, ProjectDraft } from "./draft";
  * mirrors Harbour Clinic: the same stages, the same effects and trust changes,
  * and the same endings. Generated projects use the product track only (review
  * a walkthrough and send it back with a reason), which works in any domain.
+ * Built-in projects may add the engineering track: the code of each version,
+ * reviewed line by line, and a test the brief can ask for.
  *
  * Action and checklist ids are the ones the runtime and report rely on
  * ("call-grace", C1-C3, R4, ...). They are internal and never shown.
@@ -49,10 +51,21 @@ function all(...conditions: Comparison[]): Condition {
   return { kind: "group", op: "and", conditions };
 }
 
+/**
+ * The engineering track, written by hand for built-in projects; it is not part
+ * of the draft schema, so generation never sees it.
+ */
+export type EngineeringDraft = {
+  /** What the brief asks for to get the test (C4), and what the report says about it. */
+  test: { label: string; cues: string[][]; asked: string; missed: string; file: CodeFile };
+  /** Each version's pull request: problemLines are where its flaw is; checks are shown when the brief asked for the test. */
+  code: Record<keyof typeof VARIANTS, Pick<CodeVariant, "files" | "problemLines" | "checks">>;
+};
+
 /** Bump when the structure below changes, so runs built on the old one restart. */
 export const TEMPLATE_VERSION = 1;
 
-export function buildScenario(draft: ProjectDraft, meta: { id: string; version?: number }): ProjectScenario {
+export function buildScenario(draft: ProjectDraft, meta: { id: string; version?: number }, engineering?: EngineeringDraft): ProjectScenario {
   const client = firstName(draft.client.name);
   const agent = draft.assistant.name;
 
@@ -76,16 +89,19 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     { id: "C2", label: draft.constraints.rule.label, competency: "description", cues: draft.constraints.rule.cues },
     { id: "C3", label: draft.constraints.scope.label, competency: "delegation", cues: draft.constraints.scope.cues },
   ];
+  if (engineering) {
+    brief.push({ id: "C4", label: engineering.test.label, competency: "diligence", tracks: ["engineering"], cues: engineering.test.cues });
+  }
 
   const variant = (key: keyof typeof VARIANTS, problemReason: string | null): CodeVariant => ({
     id: VARIANTS[key],
     prTitle: draft.deliverables[key].title,
     prSummary: draft.deliverables[key].summary,
-    files: [],
-    problemLines: [],
+    files: engineering?.code[key].files ?? [],
+    problemLines: engineering?.code[key].problemLines ?? [],
     problemReason,
     demo: draft.deliverables[key].demo,
-    checks: [],
+    checks: engineering?.code[key].checks ?? [],
   });
 
   return {
@@ -110,7 +126,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
           return { id: `K-${role}`, fact: FACT_IDS[role], name, explanation, bridge, misconception, inTheJob, variant, cues };
         })
       : undefined,
-    reportNotes: draft.reportNotes,
+    reportNotes: engineering ? { ...draft.reportNotes, testAsked: engineering.test.asked } : draft.reportNotes,
     facts,
     inbox: [
       { id: "client-email", kind: "email", from: draft.client.name, subject: draft.clientEmail.subject, body: draft.clientEmail.body },
@@ -160,6 +176,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
       { id: "scope", label: draft.reviewReasons.scope },
       { id: "distractor", label: draft.reviewReasons.distractor },
     ],
+    ...(engineering ? { testFile: engineering.test.file } : {}),
     stageKinds: {
       "choose-track": "choice",
       inbox: "choice",
@@ -173,6 +190,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     trackNarratives: {
       review: {
         product: `${agent} has finished and recorded a short walkthrough. Look at it as ${client} would, then approve it or send it back with a reason.`,
+        ...(engineering ? { engineering: `${agent} has opened a pull request. Read the diff and the checks. Approve it, or point at the line that's wrong and request changes.` } : {}),
       },
     },
     debriefNotes: {
@@ -193,6 +211,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
         C1: draft.debrief.missedConstraint.problem,
         C2: draft.debrief.missedConstraint.rule,
         C3: draft.debrief.missedConstraint.scope,
+        ...(engineering ? { C4: engineering.test.missed } : {}),
       },
     },
     config: simulationConfigSchema.parse({
@@ -211,7 +230,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
         persona: `${draft.client.name}, ${draft.client.role}.`,
       },
       variables: [
-        { id: "track", type: "enum", label: "Track", initial: "unset", options: ["unset", "product"], visible: false },
+        { id: "track", type: "enum", label: "Track", initial: "unset", options: engineering ? ["unset", "product", "engineering"] : ["unset", "product"], visible: false },
         { id: "trust", type: "number", label: "Client trust", initial: 5, min: 0, max: 10, visible: true, description: `How much ${client} trusts you to deliver what they need.` },
         { id: "effort", type: "number", label: "Days used", initial: 0, min: 0, max: 10, unit: "of 10", visible: true, description: "You can spend two working weeks on this job." },
         { id: "hasMetric", type: "boolean", label: "Has a success measure", initial: false, visible: false },
@@ -223,18 +242,37 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
       stages: [
         {
           id: "choose-track",
-          title: "Your role",
-          narrative: draft.learnerRole,
-          actions: [
-            {
-              id: "pick-product",
-              label: "Start the job",
-              description: `You'll judge ${agent}'s work by what it does for ${client}.`,
-              effects: [{ op: "set", variable: "track", value: "product" }],
-              feedback: `You lead the job. You'll judge ${agent}'s work by what it does for ${client}.`,
-              nextStage: "inbox",
-            },
-          ],
+          title: engineering ? "Choose your role" : "Your role",
+          narrative: engineering ? `${draft.learnerRole} Same project, two ways in. Pick the role that fits you. You can try the other one later.` : draft.learnerRole,
+          actions: engineering
+            ? [
+                {
+                  id: "pick-product",
+                  label: "Product lead",
+                  description: "No coding needed. You'll review how the software behaves.",
+                  effects: [{ op: "set", variable: "track", value: "product" }],
+                  feedback: `You're the product lead. You'll judge ${agent}'s work by how it behaves for ${client}.`,
+                  nextStage: "inbox",
+                },
+                {
+                  id: "pick-engineering",
+                  label: "Tech lead",
+                  description: `You'll review ${agent}'s pull request and code.`,
+                  effects: [{ op: "set", variable: "track", value: "engineering" }],
+                  feedback: `You're the tech lead. You'll review ${agent}'s pull request line by line.`,
+                  nextStage: "inbox",
+                },
+              ]
+            : [
+                {
+                  id: "pick-product",
+                  label: "Start the job",
+                  description: `You'll judge ${agent}'s work by what it does for ${client}.`,
+                  effects: [{ op: "set", variable: "track", value: "product" }],
+                  feedback: `You lead the job. You'll judge ${agent}'s work by what it does for ${client}.`,
+                  nextStage: "inbox",
+                },
+              ],
         },
         {
           id: "inbox",
