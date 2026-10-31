@@ -87,7 +87,10 @@ export async function assignProjects(db: SupabaseClient, classId: string, projec
   const add = wanted.filter((id) => !have.includes(id));
   const remove = have.filter((id) => !wanted.includes(id));
   if (add.length) {
-    const { error: addError } = await db.from("class_projects").insert(add.map((project_id) => ({ class_id: classId, project_id })));
+    // Saves can overlap when the instructor ticks quickly; a row already there is fine.
+    const { error: addError } = await db
+      .from("class_projects")
+      .upsert(add.map((project_id) => ({ class_id: classId, project_id })), { onConflict: "class_id,project_id", ignoreDuplicates: true });
     if (addError) throw new HttpError(addError.code === "42501" ? 403 : 503, "Could not update the projects. Please retry.");
   }
   if (remove.length) {
@@ -117,7 +120,8 @@ export function summariseRun(
   scenario: ProjectScenario,
   row: { state: SimulationState; status: string; outcome: string | null; updated_at: string } | null,
 ): RunSummary {
-  if (!row) return { status: "not-started" };
+  // Opening the desktop saves a run; it counts once the student has done something.
+  if (!row || (row.status !== "completed" && row.state.step === 0)) return { status: "not-started" };
   const state = row.state;
   const stage = scenario.config.stages.find((item) => item.id === state.stageId);
   const completed = row.status === "completed";

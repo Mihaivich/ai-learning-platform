@@ -25,6 +25,8 @@ test("a run shows the instructor where the student is, and which ideas they sett
   assert.deepEqual(summariseRun(scenario, null), { status: "not-started" });
 
   let state = startProject(scenario);
+  // Opened but not played yet.
+  assert.deepEqual(summariseRun(scenario, { state, status: "active", outcome: null, updated_at: "2026-11-02T10:00:00Z" }), { status: "not-started" });
   state = chooseAction(scenario, state, "pick-engineering").state;
   state = chooseAction(scenario, state, "call-grace").state;
   for (const fact of Object.values(tidewaterSwimDraft.facts)) state = (await askClient(scenario, state, fact.sampleQuestion, offlineEvaluator)).state;

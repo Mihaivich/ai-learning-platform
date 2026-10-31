@@ -1,26 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-/** Ticks a built-in project on or off for the class; saved at once. */
+/** Ticks a built-in project on or off for the class. It shows at once and saves behind; only the latest save counts. */
 export function AssignProjects({ classId, projects, assigned }: { classId: string; projects: { id: string; title: string }[]; assigned: string[] }) {
   const router = useRouter();
   const [chosen, setChosen] = useState(assigned);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const latest = useRef(assigned);
+  const saves = useRef(0);
 
   async function toggle(id: string) {
-    const next = chosen.includes(id) ? chosen.filter((item) => item !== id) : [...chosen, id];
-    setBusy(true);
+    const next = latest.current.includes(id) ? latest.current.filter((item) => item !== id) : [...latest.current, id];
+    latest.current = next;
+    setChosen(next);
     setError("");
+    const save = ++saves.current;
     const res = await fetch(`/api/classes/${classId}/projects`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ projects: next }) });
     const data = await res.json().catch(() => ({}));
-    setBusy(false);
+    if (save !== saves.current) return;
     if (!res.ok) {
       setError(data.error ?? "Could not save. Please try again.");
       return;
     }
+    latest.current = data.projects;
     setChosen(data.projects);
     router.refresh();
   }
@@ -36,9 +40,8 @@ export function AssignProjects({ classId, projects, assigned }: { classId: strin
                 type="button"
                 role="switch"
                 aria-checked={on}
-                disabled={busy}
                 onClick={() => void toggle(project.id)}
-                className={`rounded-full border px-4 py-2 text-sm ${on ? "border-cyan-300 bg-cyan-300/10 text-white" : "border-white/15 text-white/70 hover:border-white/40"} disabled:opacity-60`}
+                className={`rounded-full border px-4 py-2 text-sm ${on ? "border-cyan-300 bg-cyan-300/10 text-white" : "border-white/15 text-white/70 hover:border-white/40"}`}
               >
                 {on ? "✓ " : ""}
                 {project.title}

@@ -29,7 +29,8 @@ const CONCEPT: Record<ConceptResult["outcome"], { label: string; className: stri
 const RATING: Record<string, string> = { strong: "explained well", mixed: "partly explained", weak: "not explained" };
 
 function when(iso: string) {
-  return new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  // Rendered on the server, whose clock is UTC on Vercel; the class is in Hong Kong.
+  return new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Hong_Kong" });
 }
 
 function Concepts({ run }: { run: Extract<RunSummary, { status: "active" | "completed" }> }) {
