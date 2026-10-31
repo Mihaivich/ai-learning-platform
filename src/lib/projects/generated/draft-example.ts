@@ -11,6 +11,7 @@ export const harbourClinicDraft: ProjectDraft = {
   summary:
     "A small clinic keeps double-booking its morning appointments. You lead the job: find out what is really wrong, tell the coding agent what to build, review what it delivers and decide how to release it.",
   domain: "software",
+  deliverable: "the booking board",
   learnerRole: "You lead the job for a small software studio.",
   client: {
     name: "Grace Wong",

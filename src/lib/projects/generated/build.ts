@@ -49,6 +49,9 @@ function all(...conditions: Comparison[]): Condition {
   return { kind: "group", op: "and", conditions };
 }
 
+/** Bump when the structure below changes, so runs built on the old one restart. */
+export const TEMPLATE_VERSION = 1;
+
 export function buildScenario(draft: ProjectDraft, meta: { id: string; version?: number }): ProjectScenario {
   const client = firstName(draft.client.name);
   const agent = draft.assistant.name;
@@ -87,12 +90,19 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
 
   return {
     id: meta.id,
-    version: meta.version ?? 1,
+    version: meta.version ?? TEMPLATE_VERSION,
     title: draft.title,
     tagline: draft.tagline,
     summary: draft.summary,
     client: draft.client,
     assistant: draft.assistant,
+    cast: [
+      { kind: "client", name: draft.client.name, role: `${draft.client.role}, ${draft.client.organisation}`, note: "Your client. Knows the business, and only tells you what you ask about." },
+      { kind: "manager", name: draft.manager.name, role: "Your manager", note: "Gave this job two weeks. Watches the budget." },
+      { kind: "assistant", name: agent, role: draft.assistant.kind, note: "Does exactly what you ask, fast. Never asks a clarifying question." },
+      { kind: "users", name: draft.user.from, role: "Will use the result", note: "Lives with whatever you ship, and is the first to notice what you missed." },
+    ],
+    words: { deliverable: draft.deliverable ?? "the work", manager: draft.manager.name },
     reportNotes: draft.reportNotes,
     facts,
     inbox: [

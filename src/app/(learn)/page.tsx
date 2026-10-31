@@ -4,7 +4,7 @@ import { SpotlightCard } from "@/components/home/SpotlightCard";
 import { TourLink } from "@/components/home/TourLink";
 import { glass } from "@/components/home/glass";
 import { AppIcon, Avatar } from "@/components/projects/desktop/icons";
-import { APPS, DOCK, type AppId } from "@/components/projects/desktop/config";
+import { appName, DOCK, type AppId } from "@/components/projects/desktop/config";
 
 // Platform copy only. Anything about a particular scenario belongs in its listing.
 const DESK: Record<AppId, string> = {
@@ -129,7 +129,7 @@ export default function Home() {
                   <AppIcon app={app} size={52} />
                   <span className="font-mono text-sm text-white/35">0{index + 1}</span>
                 </div>
-                <h3 className="mt-5 text-xl font-semibold">{APPS[app].name}</h3>
+                <h3 className="mt-5 text-xl font-semibold">{appName(app, null)}</h3>
                 <p className="mt-2 leading-relaxed text-white/65">{DESK[app]}</p>
               </SpotlightCard>
             </li>

@@ -10,7 +10,7 @@ export function LaunchApp({ view, busy, send, onReport }: { view: ProjectView; b
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-b from-orange-50 to-white p-5 text-[13px]">
       <h2 className="text-lg font-semibold text-stone-900">Release plan</h2>
-      <p className="mt-1 text-stone-600">How does the clinic get the booking board?</p>
+      <p className="mt-1 text-stone-600">How does {view.scenario.words.deliverable} reach {view.scenario.client.organisation}?</p>
       {deciding ? (
         <div className="mt-4 grid gap-2">
           {view.actions.map((action) => (

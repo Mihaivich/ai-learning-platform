@@ -77,6 +77,17 @@ export type DebriefNotes = {
   missedConstraint: Record<string, string>;
 };
 
+/** Someone on the job, shown in the opening briefing. */
+export type CastMember = {
+  kind: "client" | "manager" | "assistant" | "users";
+  name: string;
+  role: string;
+  note: string;
+};
+
+/** A short email that follows from the learner's first move. */
+export type FollowUp = { subject: string; body: string };
+
 export type ProjectScenario = {
   id: string;
   /** Bump when content changes; running sessions created on another version restart. */
@@ -87,6 +98,16 @@ export type ProjectScenario = {
   client: { name: string; role: string; organisation: string; persona: string };
   /** The AI teammate who builds the work ("Cody, AI coding agent"). */
   assistant: { name: string; kind: string };
+  cast: CastMember[];
+  /** Short phrases the desktop's wording is built from. */
+  words: {
+    /** What the job delivers, with its article: "the booking board". */
+    deliverable: string;
+    /** The learner's manager, as named in their email. */
+    manager: string;
+  };
+  /** Mails after the first move. Generic wording is used when a scenario has none. */
+  followUps?: { call: FollowUp; delegate: FollowUp; delegateCall: FollowUp; quote: FollowUp };
   /** Scenario-specific sentences in the report, where the runtime has no generic wording. */
   reportNotes: {
     /** Delegation: the brief kept the assistant to the agreed scope. */

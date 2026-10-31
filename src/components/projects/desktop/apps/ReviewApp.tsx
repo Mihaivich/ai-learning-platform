@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ProjectView } from "@/lib/projects/runtime";
 import { Avatar } from "../icons";
-import type { Send } from "../config";
+import { reviewRepo, type Send } from "../config";
 
 export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boolean; send: Send }) {
   const work = view.work;
@@ -11,10 +11,11 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
   const [picked, setPicked] = useState<{ path: string; line: number } | null>(null);
   const [reason, setReason] = useState("");
   const engineering = view.track === "engineering";
+  const agent = view.scenario.assistant.name;
   const approve = view.actions.find((action) => action.id === "approve");
 
   if (!work) {
-    return <p className="grid h-full place-items-center p-6 text-[13px] text-stone-400">Nothing to review yet. Cody&apos;s work appears here.</p>;
+    return <p className="grid h-full place-items-center p-6 text-[13px] text-stone-400">Nothing to review yet. {agent}&apos;s work appears here.</p>;
   }
 
   const failing = work.checks.some((check) => !check.passed);
@@ -23,7 +24,7 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
   return (
     <div className="h-full overflow-y-auto bg-white text-[13px]">
       <div className="border-b border-black/10 px-5 py-4">
-        <p className="text-stone-500">harbour-clinic / booking-board</p>
+        <p className="text-stone-500">{reviewRepo(view).replace("/", " / ")}</p>
         <h2 className="mt-1 text-lg font-semibold text-stone-900">
           {work.prTitle} <span className="font-normal text-stone-400">#12</span>
         </h2>
@@ -31,7 +32,7 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
           <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-medium text-white ${merged ? "bg-violet-600" : "bg-emerald-600"}`}>
             {merged ? "Merged" : "Open"}
           </span>
-          <span className="text-stone-500">Cody wants to merge into <code className="rounded bg-blue-50 px-1 text-blue-700">main</code></span>
+          <span className="text-stone-500">{agent} wants to merge into <code className="rounded bg-blue-50 px-1 text-blue-700">main</code></span>
         </div>
       </div>
 
@@ -39,7 +40,7 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
         <div className="flex gap-3">
           <Avatar initials="C" tone="from-violet-500 to-fuchsia-500" size={32} />
           <div className="min-w-0 flex-1 rounded-lg border border-black/10">
-            <p className="border-b border-black/10 bg-stone-50 px-3 py-1.5 text-stone-500"><span className="font-semibold text-stone-800">Cody</span> commented</p>
+            <p className="border-b border-black/10 bg-stone-50 px-3 py-1.5 text-stone-500"><span className="font-semibold text-stone-800">{agent}</span> commented</p>
             <p className="p-3 text-stone-800">{work.prSummary}</p>
           </div>
         </div>
@@ -103,7 +104,7 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
             <p className="font-semibold text-stone-900">Your change requests</p>
             <ul className="mt-1 space-y-0.5 text-stone-700">
               {work.reviews.map((review, index) => (
-                <li key={index}>{review.label}: {review.correct ? "Cody fixed it and updated the work." : "Cody found nothing to change."}</li>
+                <li key={index}>{review.label}: {review.correct ? `${agent} fixed it and updated the work.` : `${agent} found nothing to change.`}</li>
               ))}
             </ul>
           </div>

@@ -99,6 +99,19 @@ export const harbourClinic: ProjectScenario = {
       "Grace Wong, practice manager at Harbour Family Clinic, a small family clinic. Friendly, busy and not technical. Speaks in short, natural sentences, sometimes mentions patients or staff by name. Cares about the budget and about not upsetting patients. Describes solutions ('an app like the big clinics') rather than problems unless asked good questions.",
   },
   assistant: { name: "Cody", kind: "AI coding agent" },
+  cast: [
+    { kind: "client", name: "Grace Wong", role: "Practice manager, Harbour Family Clinic", note: "Your client. Busy, not technical, knows how the front desk really works." },
+    { kind: "manager", name: "Leo", role: "Your manager at the studio", note: "Gave this job two weeks. Watches the budget." },
+    { kind: "assistant", name: "Cody", role: "AI coding agent", note: "Builds exactly what you ask for, fast. Never asks a clarifying question." },
+    { kind: "users", name: "Mandy & Kit", role: "Receptionists", note: "Share one PC and one spreadsheet. They'll use whatever you ship." },
+  ],
+  words: { deliverable: "the booking board", manager: "Leo" },
+  followUps: {
+    call: { subject: "Re: Can you build us an app?", body: "Of course! I have a few minutes between patients right now. I'll ring you on Meet.\n\nGrace" },
+    delegate: { subject: "Started: patient booking app", body: "I scaffolded a patient booking app with sign-up, login and online booking. I assumed patients will book themselves. Two days of work so far.\n\nCody" },
+    delegateCall: { subject: "Before you go further…", body: "Leo says you've started building something. Before you go further, can we talk? I'll ring you on Meet.\n\nGrace" },
+    quote: { subject: "Re: Quote", body: "Thanks for the quote, but I'm honestly not sure what I'd be paying for. Can we talk first? I'll ring you on Meet.\n\nGrace" },
+  },
   reportNotes: {
     scopeKept: "Your brief kept Cody to the staff booking board.",
     pilot: "You piloted with one receptionist first, which limits the damage of anything you missed.",

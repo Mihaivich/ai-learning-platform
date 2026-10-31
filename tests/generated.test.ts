@@ -20,6 +20,18 @@ import {
   type ProjectStep,
 } from "../src/lib/projects/runtime";
 import type { SimulationHistory } from "../src/lib/learning/simulation/engine";
+import { harbourClinic } from "../src/lib/projects/harbour-clinic";
+import { isGeneratedId, newGeneratedId } from "../src/lib/projects/generated/store";
+import { mailbox } from "../src/components/projects/desktop/mail";
+import {
+  appName,
+  appTitle,
+  DOCK,
+  guideFor,
+  nextStep,
+  reviewRepo,
+  stepsFor,
+} from "../src/components/projects/desktop/config";
 
 // A real draft written by gemini-3.5-flash, kept as a regression fixture.
 const marketingDraft = projectDraftSchema.parse(
@@ -128,4 +140,55 @@ test("the schema sent to Gemini drops array counts but keeps length limits", () 
   const text = JSON.stringify(schema);
   assert.equal(text.includes("minItems") || text.includes("maxItems") || text.includes("$schema"), false);
   assert.equal(text.includes('"maxLength":10'), true);
+});
+
+test("the desktop's wording comes from the project, not from Harbour Clinic", async () => {
+  const scenario = buildScenario(marketingDraft, { id: "gen-abcdef123456" });
+  let state = startProject(scenario);
+  const history: SimulationHistory = [];
+  const take = (step: ProjectStep) => {
+    history.push(...step.events);
+    return step.state;
+  };
+  state = take(chooseAction(scenario, state, "pick-product"));
+  state = take(chooseAction(scenario, state, "cody-starts"));
+  const view = projectView(scenario, state, history);
+
+  const text = JSON.stringify([
+    mailbox(view),
+    guideFor(view),
+    nextStep(view),
+    stepsFor(view),
+    DOCK.map((app) => [appName(app, view), appTitle(app, view)]),
+  ]);
+  for (const word of ["Grace", "Cody", "Harbour", "harbour", "clinic", "booking", "Leo", "Kit"]) {
+    assert.equal(text.includes(word), false, `"${word}" appears in a generated project's desktop`);
+  }
+  assert.equal(text.includes(marketingDraft.client.name), true);
+  assert.equal(appName("cody", view), marketingDraft.assistant.name);
+  // Choosing to delegate first brings the assistant's update and the client's follow-up.
+  assert.deepEqual(mailbox(view).slice(0, 2).map((mail) => mail.from), [marketingDraft.client.name, marketingDraft.assistant.name]);
+});
+
+test("Harbour Clinic keeps its own follow-up mails and review header", () => {
+  let state = startProject(harbourClinic);
+  const history: SimulationHistory = [];
+  for (const action of ["pick-engineering", "call-grace"]) {
+    const step = chooseAction(harbourClinic, state, action);
+    history.push(...step.events);
+    state = step.state;
+  }
+  const view = projectView(harbourClinic, state, history);
+  const reply = mailbox(view)[0];
+  assert.equal(reply.from, "Grace Wong");
+  assert.equal(reply.subject, "Re: Can you build us an app?");
+  assert.equal(reviewRepo(view), "harbour-clinic/booking-board");
+  assert.equal(appTitle("cody", view), "Cody — AI coding agent");
+});
+
+test("generated project ids are unguessable and match the table's check", () => {
+  const ids = new Set(Array.from({ length: 200 }, () => newGeneratedId()));
+  assert.equal(ids.size, 200);
+  for (const id of ids) assert.match(id, /^gen-[a-z0-9]{12}$/);
+  assert.equal(isGeneratedId("harbour-clinic"), false);
 });

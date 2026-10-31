@@ -5,7 +5,7 @@ import type {
   SimulationHistory,
   SimulationState,
 } from "@/lib/learning/simulation/engine";
-import { getProjectScenario } from "@/lib/projects";
+import { loadProjectScenario } from "@/lib/projects";
 import { enforceQuota } from "@/lib/ai/quota";
 import { aiEvaluator } from "@/lib/projects/ai-evaluator";
 import {
@@ -70,9 +70,9 @@ function sameVersion(session: SessionRow, scenario: ProjectScenario) {
   return value?.project === scenario.id && value?.version === scenario.version;
 }
 
-async function scenarioFrom(params: Promise<{ scenarioId: string }>) {
+async function scenarioFrom(params: Promise<{ scenarioId: string }>, userId: string) {
   const { scenarioId } = await params;
-  const scenario = getProjectScenario(scenarioId);
+  const scenario = await loadProjectScenario(scenarioId, userId);
   if (!scenario) throw new HttpError(404, "Project not found.");
   return scenario;
 }
@@ -196,8 +196,8 @@ export async function GET(
   { params }: { params: Promise<{ scenarioId: string }> },
 ) {
   try {
-    const scenario = await scenarioFrom(params);
     const { user } = await requireAccount();
+    const scenario = await scenarioFrom(params, user.id);
     const session = await readSession(user.id, scenario);
     if (!session || !sameVersion(session, scenario)) return Response.json({ view: null });
     return Response.json({ view: viewOf(scenario, session) });
@@ -211,8 +211,8 @@ export async function POST(
   { params }: { params: Promise<{ scenarioId: string }> },
 ) {
   try {
-    const scenario = await scenarioFrom(params);
     const { db, user } = await requireAccount();
+    const scenario = await scenarioFrom(params, user.id);
     const parsed = bodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new HttpError(400, "That request is not valid.");
     const body = parsed.data;

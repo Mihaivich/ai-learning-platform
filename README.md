@@ -69,6 +69,7 @@ A run usually makes 4 to 6 requests (about half the interview questions, plus th
 | macOS-style desktop with guided steps, one-by-one mail and sound cues | Done |
 | Public home page with the product tour, and the projects page | Done |
 | Saved runs, restart, sign-in with GitHub or a magic link | Done |
+| Create a project for any field, saved privately and played on the same desktop | Done |
 | Evaluator for free text | Gemini, with a keyword fallback (see above) |
 | Client trust that a well-run project can raise to 10, explained in the report | Done |
 | Teacher view of class results (read-only) | Planned |
@@ -171,13 +172,15 @@ AI can write a new project for any domain, inside the same fixed structure, so a
 3. **Check** (`validate.ts`): the engine's consistency check, then the keyword fallback. Every fact must be reachable and the sample answers must cover every checklist item. Then automatic playthroughs: the perfect path must reach success at trust 10, and every flawed version must fail on a full release, be caught by a pilot and be fixed when sent back for the right reason.
 4. **Generate** (`generate.ts`): asks `gemini-3.5-flash` first, then the play-time chain, with Harbour Clinic as the worked example (`draft-example.ts`). A draft that fails its checks goes back to the model once, with the problems.
 
-To try it from the command line:
+In the app, signed-in users create one at **/projects/new**: a field and a one-line job. It's saved in `generated_projects`, private to its owner, and appears under "Your projects" on `/projects`. It plays on the same desktop, whose wording (cast, mails, guide, the assistant's name) comes from the project. The table gives browsers the listing columns only; the draft, which holds the hidden facts, is read by the server after an ownership check.
+
+To try the generator from the command line:
 
 ```bash
 npm run generate:project -- "marketing" "a loyalty programme for a neighbourhood café" draft.json
 ```
 
-A generation takes about a minute. `docs/scenarios/examples/` keeps a real generated draft, which the tests check. Generated projects can't be played in the app yet; saving them and the desktop's wording for other domains come next.
+A generation takes about a minute. `docs/scenarios/examples/` keeps a real generated draft, which the tests check.
 
 ## Scripts
 

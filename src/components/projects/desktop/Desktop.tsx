@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-store";
 import { play, readSoundSetting, unlockSound, writeSoundSetting } from "@/lib/sound";
 import type { ProjectView } from "@/lib/projects/runtime";
-import { APPS, DOCK, STAGE_APP, nextStep, type AppId, type Op } from "./config";
+import { appName, appTitle, DOCK, STAGE_APP, nextStep, type AppId, type Op } from "./config";
 import { AppIcon } from "./icons";
 import { mailbox } from "./mail";
 import { Briefing, Notifications, ProjectWidget, Report, type Notice } from "./Overlays";
@@ -46,7 +46,6 @@ export function Desktop({
   scenarioId: string;
   title: string;
   summary: string;
-  client: { name: string; role: string; organisation: string };
 }) {
   const { ready, user } = useAuth();
   const [view, setView] = useState<ProjectView | null>(null);
@@ -271,7 +270,7 @@ export function Desktop({
       {/* Menu bar */}
       <header className="absolute inset-x-0 top-0 z-[960] flex h-7 items-center gap-4 bg-white/40 px-3 text-[13px] text-stone-900 backdrop-blur-xl">
         <Link href="/" aria-label="Leave the desktop and return to DevPath" className="font-bold tracking-tight">◆</Link>
-        <span className="font-semibold">{focused ? APPS[focused].name : "Finder"}</span>
+        <span className="font-semibold">{focused ? appName(focused, view) : "Finder"}</span>
         {step && needed ? (
           <button
             type="button"
@@ -315,7 +314,7 @@ export function Desktop({
         return (
           <Window
             key={app}
-            title={APPS[app].title}
+            title={appTitle(app, view)}
             frame={state.frame}
             z={state.z}
             focused={focused === app}
@@ -354,14 +353,14 @@ export function Desktop({
                 <button
                   type="button"
                   onClick={() => openApp(app)}
-                  aria-label={`${APPS[app].name}${badge ? `, ${badge} new` : ""}`}
+                  aria-label={`${appName(app, view)}${badge ? `, ${badge} new` : ""}`}
                   className={`group flex flex-col items-center transition-transform duration-150 hover:-translate-y-2 motion-reduce:transition-none ${
                     // The hover lift (translate) and the bounce (transform) would add up, so a
                     // hovered icon stops bouncing and just lifts like the others.
                     app === attention ? "animate-[dock-attention_3s_ease-in-out_infinite] hover:animate-none motion-reduce:animate-none" : ""
                   }`}
                 >
-                  <span className="pointer-events-none absolute -top-8 hidden whitespace-nowrap rounded-md bg-stone-800/80 px-2 py-0.5 text-[12px] text-white group-hover:block">{APPS[app].name}</span>
+                  <span className="pointer-events-none absolute -top-8 hidden whitespace-nowrap rounded-md bg-stone-800/80 px-2 py-0.5 text-[12px] text-white group-hover:block">{appName(app, view)}</span>
                   <AppIcon app={app} size={compact ? 42 : 50} />
                   {badge > 0 && (
                     <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#ff3b30] px-1 text-[11px] font-semibold text-white shadow">{badge}</span>

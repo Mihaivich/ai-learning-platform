@@ -60,6 +60,9 @@ export const projectDraftSchema = z.object({
   tagline: text(140),
   summary: text(400),
   domain: text(60).describe("The field, such as marketing or event planning."),
+  deliverable: text(60)
+    .optional()
+    .describe('What the job delivers, with its article, as people at the client would say it: "the loyalty card", "the booking board".'),
   learnerRole: text(160).describe('Who the learner is, such as "You lead the job for a small marketing agency."'),
   client: z.object({
     name: text(40),
