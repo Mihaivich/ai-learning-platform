@@ -69,13 +69,13 @@ export const parcelPalDraft: ProjectDraft = {
     scope: {
       text: "The job is only how deliveries are confirmed and charged. Shops have asked for a live map, but that is not this job, and the budget is about two weeks of work.",
       reply: "Just the charging, please. Shops keep asking for a live map of their parcels, but that's next year. Leo quoted us two weeks and that's the budget.",
-      cues: ["budget", "cost", "scope", "map", "dashboard", "features", "how much", "in scope"],
+      cues: ["budget", "spend", "scope", "map", "dashboard", "features", "off the table", "in scope"],
       sampleQuestion: "What's in scope for this job, and what's the budget?",
     },
     detail: {
       text: "Each delivery costs the shop £6.50, shops are billed weekly, and ParcelPal makes about 900 deliveries a day.",
       reply: "Every delivery is six pounds fifty to the shop. We bill weekly, and we're doing about nine hundred deliveries a day now.",
-      cues: ["fee", "price", "how many", "per day", "a day", "volume", "billed", "invoice"],
+      cues: ["fee", "price", "cost", "how many", "how much", "per day", "a day", "traffic", "volume", "billed"],
       sampleQuestion: "How many deliveries a day, and what's the fee per delivery?",
     },
     environment: {
