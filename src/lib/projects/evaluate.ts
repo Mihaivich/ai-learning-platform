@@ -39,12 +39,17 @@ export function normalise(text: string): string {
 
 /**
  * A cue matches at the start of a word, so "cancel" matches "cancelled" but
- * "app" does not match "happen". Cues are normalised the same way as the text.
+ * "app" does not match "happen". A cue of three letters or fewer matches a
+ * whole word or its usual endings only: "log", "logs" and "logged", but "app"
+ * never matches "appointment". Cues are normalised the same way as the text.
  */
 export function cueHits(text: string, cues: string[]): number {
   return cues.filter((cue) => {
     const needle = normalise(cue).trimEnd();
-    return needle.trim() !== "" && text.includes(needle);
+    if (needle.trim() === "") return false;
+    if (needle.trim().length > 3) return text.includes(needle);
+    const last = needle.at(-1);
+    return new RegExp(`${needle}(?:s|es|ed|ing|${last}ed|${last}ing)? `).test(text);
   }).length;
 }
 

@@ -416,6 +416,8 @@ export type ProjectView = {
     summary: string;
     debrief: string;
     cards: ProjectCard[];
+    /** The concepts the job taught, and how the learner did with each. Empty without concepts. */
+    concepts: ConceptResult[];
     /** Every change to client trust, in order, with the reason the client saw. */
     trust: { start: number; changes: { delta: number; reason: string }[] };
   } | null;
@@ -503,10 +505,6 @@ export function projectCards(
         : "You approved work with a problem in it. The walkthrough showed it.",
     );
   }
-  for (const review of memo.reviews) {
-    const concept = scenario.concepts?.find((item) => item.id === review.explanation?.concept);
-    if (concept && review.explanation) discernment.push(explanationFeedback(scenario, concept, review.explanation.covered).text);
-  }
   if (wrongRequests) {
     discernment.push(
       `${wrongRequests} change request${wrongRequests === 1 ? "" : "s"} named the wrong problem and cost time.`,
@@ -546,6 +544,57 @@ export function projectCards(
     { competency: "discernment", title: "Discernment", rating: rating(discernmentScore, 2), evidence: discernment },
     { competency: "diligence", title: "Diligence", rating: rating(diligenceScore, 2), evidence: diligence },
   ];
+}
+
+/** What became of one concept in the run: found, prevented, caught or missed, and the note on it. */
+export type ConceptResult = {
+  name: string;
+  /** The learner uncovered its fact on the call. */
+  found: boolean;
+  outcome: "prevented" | "caught" | "shipped" | "left-out" | "not-reached";
+  rating: ProjectCard["rating"];
+  summary: string;
+  misconception: string;
+  note?: { text: string; rating: ProjectCard["rating"]; feedback: string };
+};
+
+export function conceptResults(scenario: ProjectScenario, state: SimulationState): ConceptResult[] {
+  const memo = memoOf(state);
+  const agent = scenario.assistant.name;
+  return (scenario.concepts ?? []).map((concept) => {
+    const found = memo.interview.revealed.includes(concept.fact);
+    const constraint = scenario.variantRules.find((rule) => rule.variant === concept.variant)?.missing;
+    const review = memo.reviews.find((item) => item.correct && item.variant === concept.variant);
+    const explanation = memo.reviews.find((item) => item.explanation?.concept === concept.id)?.explanation;
+    const feedback = explanation ? explanationFeedback(scenario, concept, explanation.covered) : null;
+    const note = explanation && feedback ? { text: explanation.text, rating: feedback.rating, feedback: feedback.text } : undefined;
+    const base = { name: concept.name, found, misconception: concept.misconception };
+
+    if (!memo.brief) {
+      return { ...base, outcome: "not-reached", rating: "weak", summary: "The job ended before the work got this far." };
+    }
+    if (constraint && memo.brief.covered.includes(constraint)) {
+      return { ...base, outcome: "prevented", rating: "strong", summary: `Your brief covered it, so ${agent} never made the classic mistake.` };
+    }
+    if (review) {
+      return {
+        ...base,
+        outcome: "caught",
+        rating: note?.rating === "strong" ? "strong" : "mixed",
+        summary: `${agent} made the classic mistake, and you sent it back for the right reason.`,
+        ...(note ? { note } : {}),
+      };
+    }
+    if (state.variables.variant === concept.variant) {
+      return { ...base, outcome: "shipped", rating: "weak", summary: `${agent} made the classic mistake, and it was still in the work at the end.` };
+    }
+    return {
+      ...base,
+      outcome: "left-out",
+      rating: "mixed",
+      summary: `Your brief left it out. The work ended up right only because ${agent} redid it, not because anyone checked.`,
+    };
+  });
 }
 
 /** Trust changes from the run's history, plus the outcome's change at the end. */
@@ -692,6 +741,7 @@ export function projectView(
             summary: state.summary ?? scenario.config.debrief[state.outcome],
             debrief: scenario.config.debrief[state.outcome],
             cards: projectCards(scenario, state, history),
+            concepts: conceptResults(scenario, state),
             trust: trustChanges(scenario, history, memo),
           }
         : null,
