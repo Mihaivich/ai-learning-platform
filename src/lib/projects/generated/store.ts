@@ -57,7 +57,7 @@ export async function saveGeneratedProject(
   const { error } = await recordDb().from("generated_projects").insert({
     id: project.scenario.id,
     owner_id: ownerId,
-    domain: request.domain.trim().slice(0, 80),
+    domain: (request.domain.trim() || project.draft.domain).slice(0, 80),
     topic: request.topic.trim().slice(0, 200),
     title: project.draft.title,
     tagline: project.draft.tagline,

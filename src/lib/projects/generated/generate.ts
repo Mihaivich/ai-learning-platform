@@ -14,7 +14,7 @@ import { checkProject, type ProjectCheck } from "./validate";
  */
 
 export type ProjectRequest = {
-  /** The field, such as "marketing". */
+  /** The field, such as "marketing". May be empty: the model sets the job in the learner's world. */
   domain: string;
   /** What the job is about, such as "a loyalty programme for a café". With a subject it may be empty: the model picks one. */
   topic: string;
@@ -79,6 +79,7 @@ Concept missions. When a subject is given, the job teaches it:
   For a learner new to the subject, pick its most fundamental concepts and explain them plainly; for one who is
   comfortable, pick subtler concepts whose misconceptions still catch people who know the basics.
 - Without a topic, choose a realistic, specific job in the domain where the subject decides the outcome.
+  Without a domain, use the learner's own field; if that isn't clear either, pick an everyday setting.
 - The problem fact and the rule fact each rest on a real concept of the subject. Write both concepts.
   In a concept mission the "rule" is a principle of the subject that must not be broken (a sound method, a safety
   limit, a grammar rule), not an organisational policy, so that understanding the concept is what protects it.
@@ -117,7 +118,7 @@ export function generationModels(): string[] {
 function userPrompt(request: ProjectRequest, repair?: { draft: ProjectDraft; problems: string[] }) {
   const lines = [
     "Write a project.",
-    `Domain: ${request.domain.trim().slice(0, 80)}`,
+    `Domain: ${request.domain.trim().slice(0, 80) || "(none given: the learner's own field)"}`,
     `Topic: ${request.topic.trim().slice(0, 200) || "(none given: choose one)"}`,
   ];
   if (request.focus) lines.push(`Let the learner practise especially: ${request.focus.trim().slice(0, 120)}`);

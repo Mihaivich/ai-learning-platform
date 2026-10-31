@@ -10,7 +10,7 @@ export default function NewProjectPage() {
       <Reveal>
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Create a project</h1>
         <p className="mt-4 text-lg text-white/65">
-          Choose any field, and a subject if you want to learn one. The AI writes a client with a real problem, an AI teammate and everything that can go wrong, set in your world. It plays on the same desktop as every other project.
+          Tell us who you are and what you want to learn. The AI writes a client with a real problem, an AI teammate and everything that can go wrong, set in your world. It plays on the same desktop as every other project.
         </p>
       </Reveal>
       <div className="mt-10">

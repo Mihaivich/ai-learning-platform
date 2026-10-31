@@ -27,6 +27,8 @@ const stepSchema = z.object({
 
 export const pathPlanSchema = z.object({
   title: text(60),
+  // Optional so that paths planned before the field was inferred still load.
+  field: text(60).optional().describe("The field all the jobs are set in, in one or two words, such as nursing."),
   summary: text(300).describe("Two sentences on what the learner will be able to do after the path."),
   steps: z.array(stepSchema).length(PATH_STEPS),
 });
@@ -34,6 +36,7 @@ export const pathPlanSchema = z.object({
 export type PathPlan = z.infer<typeof pathPlanSchema>;
 export type PathStep = z.infer<typeof stepSchema>;
 
+/** domain may be empty: the plan then chooses the field from the learner. */
 export type PathRequest = { subject: string; domain: string; learner?: string; level?: Level };
 
 /** Problems with a plan; empty when it can be used. */
@@ -68,13 +71,14 @@ Plan the path:
 - All ${PATH_STEPS * 2} concepts are different ideas. Order them so each step builds on the ones before.
 - Start at the learner's level and never go down. Move up when the concepts get subtler.
 - Every job is in the given field and the learner's own world, with a specific client. Vary the clients and settings.
+  Name that field in "field".
 - Write plain English for a non-specialist. All people and organisations are fictional.`;
 
 function planPrompt(request: PathRequest, repair?: { plan: PathPlan; problems: string[] }) {
   const lines = [
     "Plan a learning path.",
     `Subject: ${request.subject.trim().slice(0, 80)}`,
-    `Field: ${request.domain.trim().slice(0, 80)}`,
+    `Field: ${request.domain.trim().slice(0, 80) || "(none given: the learner's own field, or an everyday setting)"}`,
   ];
   if (request.learner) lines.push(`The learner: ${request.learner.trim().slice(0, 160)}`);
   if (request.level) lines.push(`The learner's level: ${request.level} (${LEVEL_PROMPTS[request.level]})`);
@@ -125,7 +129,7 @@ export async function savePath(ownerId: string, request: PathRequest, plan: Path
     id,
     owner_id: ownerId,
     subject: request.subject.trim().slice(0, 80),
-    domain: request.domain.trim().slice(0, 80),
+    domain: (request.domain.trim() || plan.field || "everyday life").slice(0, 80),
     title: plan.title,
     summary: plan.summary,
     plan,
