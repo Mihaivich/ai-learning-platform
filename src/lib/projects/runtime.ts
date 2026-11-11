@@ -8,8 +8,18 @@ import {
   type SimulationState,
 } from "@/lib/learning/simulation/engine";
 import type { SimulationOutcome } from "@/lib/learning/simulation/schema";
+import {
+  buildBriefComposer,
+  buildRequirementsComposer,
+  buildReviewNoteOptions,
+  buildSuggestedQuestions,
+  buildVivaOptions,
+  type ComposerOption,
+  type ComposerSlot,
+} from "./composer";
 import { normalise, type Grader, type InterviewTurn, type ProjectEvaluator } from "./evaluate";
 import type {
+  ArtifactKind,
   ChecklistItem,
   ProjectConcept,
   CodeVariant,
@@ -31,6 +41,8 @@ export type ProjectMemo = {
   brief?: { text: string; covered: string[]; variant: string; grader?: Grader };
   /** The trust change applied once the outcome was known, if any. */
   outcomeTrust?: { delta: number; reason: string };
+  /** Optional oral defense (mock interview) before release. */
+  viva?: { text: string; covered: string[]; trustDelta: number; grader?: Grader };
   reviews: {
     variant: string;
     reasonId?: string;
@@ -280,7 +292,8 @@ export function requestChanges(
     const line = typeof input.line === "number" ? input.line : NaN;
     const file = variant.files.find((item) => item.path === path);
     if (!file || !Number.isInteger(line) || line < 1 || line > file.lines.length) {
-      throw new SimulationError("Pick the line in the pull request that you want changed.");
+      const target = scenario.artifactKind && scenario.artifactKind !== "code" ? "entry in the deliverable" : "line in the pull request";
+      throw new SimulationError(`Pick the ${target} that you want changed.`);
     }
     correct = variant.problemLines.some((item) => item.path === path && item.line === line);
     Object.assign(review, { path, line });
@@ -354,6 +367,63 @@ function explanationFeedback(scenario: ProjectScenario, concept: ProjectConcept,
   return { rating: "weak" as const, text: `Your note didn't say why it was wrong. The idea behind it is ${idea}: the report explains it at the end.` };
 }
 
+function vivaFeedback(scenario: ProjectScenario, covered: string[]) {
+  const client = scenario.client.name.split(" ")[0];
+  const total = scenario.viva?.items.length ?? 2;
+  if (covered.length >= total) {
+    return {
+      rating: "strong" as const,
+      feedback: `${client} nods: you named the core risk in this setting and how your rollout verifies the result.`,
+    };
+  }
+  if (covered.includes("V1")) {
+    return {
+      rating: "mixed" as const,
+      feedback: `You spotted the main risk, though ${client} also wanted to hear how you'll measure or pilot the rollout.`,
+    };
+  }
+  if (covered.length > 0) {
+    return {
+      rating: "mixed" as const,
+      feedback: `You explained how you'll check the rollout, though you didn't name the specific domain trap to watch for.`,
+    };
+  }
+  return {
+    rating: "weak" as const,
+    feedback: "Your answer stayed general — name what could go wrong in this job and how you'll verify the outcome.",
+  };
+}
+
+/**
+ * Answers the client's sign-off defense question right before launch. Strong
+ * answers earn up to +1 client trust (clamped to max).
+ */
+export async function answerViva(
+  scenario: ProjectScenario,
+  state: SimulationState,
+  writing: unknown,
+  evaluator: ProjectEvaluator,
+): Promise<ProjectStep> {
+  requireStage(state, "release", "Sign-off questions are asked right before release.");
+  if (!scenario.viva) throw new SimulationError("This project has no sign-off question.", 409);
+  const memo = memoOf(state);
+  if (memo.viva) throw new SimulationError("You have already answered the sign-off question.", 409);
+  const text = cleanText(writing, MAX_EXPLANATION, "answer");
+  const result = await evaluator.checklist({ items: scenario.viva.items, text });
+  const covered = validIds(result.covered, scenario.viva.items.map((item) => item.id));
+  const strong = covered.length >= scenario.viva.items.length;
+  const variable = scenario.config.variables.find((item) => item.id === "trust");
+  const [min, max] = variable?.type === "number" ? [variable.min, variable.max] : [0, 10];
+  const before = Number(state.variables.trust ?? 0);
+  const after = strong ? Math.min(max, Math.max(min, before + 1)) : before;
+  const trustDelta = after - before;
+  const nextState = trustDelta ? { ...state, variables: { ...state.variables, trust: after } } : state;
+  return {
+    state: withMemo(nextState, { ...memo, viva: { text, covered, trustDelta, grader: result.grader } }),
+    events: [],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public view. Hidden variables, checklists, variant ids and rules stay here.
 
@@ -371,6 +441,7 @@ export type ProjectView = {
     summary: string;
     client: ProjectScenario["client"];
     assistant: ProjectScenario["assistant"];
+    artifactKind: ArtifactKind | null;
     cast: ProjectScenario["cast"];
     words: ProjectScenario["words"];
     followUps: ProjectScenario["followUps"] | null;
@@ -386,12 +457,20 @@ export type ProjectView = {
     asked: number;
     min: number;
     max: number;
+    suggestedQuestions: string[];
   };
   notes: string[];
   /** How many concepts the job teaches. They are named and explained in the report, after the release. */
   conceptCount: number;
   requirements: { text: string; coveredCount: number; total: number } | null;
+  requirementsComposer: ComposerSlot[] | null;
   brief: { text: string } | null;
+  briefComposer: ComposerSlot[] | null;
+  viva: {
+    question: string;
+    options: ComposerOption[];
+    response: { text: string; rating: ProjectCard["rating"]; feedback: string; trustDelta: number } | null;
+  } | null;
   work: {
     prTitle: string;
     prSummary: string;
@@ -399,6 +478,7 @@ export type ProjectView = {
     checks: CodeVariant["checks"];
     demo: CodeVariant["demo"];
     reasons: ProjectScenario["reviewReasons"];
+    noteOptions: ComposerOption[];
     reviews: {
       label: string;
       correct: boolean;
@@ -503,9 +583,12 @@ export function projectCards(
     discernmentScore = 2;
     discernment.push(`You spotted what was wrong with ${agent}'s work and sent it back for the right reason.`);
   } else {
+    const isCode = !scenario.artifactKind || scenario.artifactKind === "code";
     discernment.push(
       track === "engineering"
-        ? "You approved a pull request with a problem in it. The diff and the checks showed it."
+        ? isCode
+          ? "You approved a pull request with a problem in it. The diff and the checks showed it."
+          : "You approved a deliverable with a flaw in it. Inspecting the entries would have caught it."
         : "You approved work with a problem in it. The walkthrough showed it.",
     );
   }
@@ -524,11 +607,19 @@ export function projectCards(
   } else {
     diligence.push(scenario.debriefNotes.missedRequirement.R4);
   }
-  if (track === "engineering") {
+  if (track === "engineering" && (!scenario.artifactKind || scenario.artifactKind === "code")) {
     if (briefCovered.includes("C4")) {
       diligence.push(scenario.reportNotes.testAsked ?? `You asked ${agent} for a test.`);
-    } else {
+    } else if (scenario.debriefNotes.missedConstraint.C4) {
       diligence.push(scenario.debriefNotes.missedConstraint.C4);
+    }
+  }
+  if (memo.viva && scenario.viva) {
+    const graded = vivaFeedback(scenario, memo.viva.covered);
+    if (graded.rating === "strong") {
+      diligence.push("Your sign-off defense explained both the main domain trap and how your rollout verifies success.");
+    } else if (graded.rating === "mixed") {
+      diligence.push("You answered the client's sign-off check, covering part of the risk and rollout plan.");
     }
   }
   const release = state.variables.release;
@@ -615,6 +706,12 @@ function trustChanges(scenario: ProjectScenario, history: SimulationHistory, mem
       if (delta) changes.push({ delta, reason: scenario.trust.reasons[event.actionId] ?? event.actionLabel });
     }
   }
+  if (memo.viva?.trustDelta) {
+    changes.push({
+      delta: memo.viva.trustDelta,
+      reason: scenario.trust.reasons["viva-strong"] ?? "Clear sign-off explanation before rollout.",
+    });
+  }
   if (memo.outcomeTrust?.delta) changes.push(memo.outcomeTrust);
   return { start: Number(variable?.initial ?? 0), changes };
 }
@@ -642,6 +739,16 @@ export function projectView(
     ),
   );
 
+  const artifactKind: ArtifactKind | null =
+    scenario.artifactKind ?? (scenario.variants.some((item) => item.files.length > 0) ? "code" : null);
+  const entryLabel = (path?: string, line?: number) => {
+    if (artifactKind === "table") return `${path}, row ${line}`;
+    if (artifactKind === "document") return `${path}, §${line}`;
+    if (artifactKind === "steps") return `${path}, step ${line}`;
+    return `${path}, line ${line}`;
+  };
+  const showViva = scenario.viva && (state.stageId === "release" || (state.status === "completed" && Boolean(memo.viva)));
+
   return {
     scenario: {
       id: scenario.id,
@@ -649,6 +756,7 @@ export function projectView(
       summary: scenario.summary,
       client: scenario.client,
       assistant: scenario.assistant,
+      artifactKind,
       cast: scenario.cast,
       words: scenario.words,
       followUps: scenario.followUps ?? null,
@@ -669,6 +777,10 @@ export function projectView(
       asked: memo.interview.turns.filter((turn) => turn.role === "learner").length,
       min: scenario.interview.minQuestions,
       max: scenario.interview.maxQuestions,
+      suggestedQuestions:
+        state.stageId === "interview" && state.status === "active"
+          ? buildSuggestedQuestions(scenario, memo.interview.turns)
+          : [],
     },
     notes: scenario.facts
       .filter((fact) => memo.interview.revealed.includes(fact.id))
@@ -683,7 +795,31 @@ export function projectView(
           total: itemsFor(scenario.requirements, track).length,
         }
       : null,
+    requirementsComposer:
+      state.stageId === "requirements" && state.status === "active"
+        ? buildRequirementsComposer(scenario, track, memo.interview.revealed)
+        : null,
     brief: memo.brief ? { text: memo.brief.text } : null,
+    briefComposer:
+      (state.stageId === "brief" || state.stageId === "brief-test") && state.status === "active"
+        ? buildBriefComposer(scenario, track, memo.interview.revealed)
+        : null,
+    viva: showViva && scenario.viva
+      ? {
+          question: scenario.viva.question,
+          options:
+            state.stageId === "release" && state.status === "active" && !memo.viva
+              ? buildVivaOptions(scenario)
+              : [],
+          response: memo.viva
+            ? {
+                text: memo.viva.text,
+                ...vivaFeedback(scenario, memo.viva.covered),
+                trustDelta: memo.viva.trustDelta,
+              }
+            : null,
+        }
+      : null,
     work: showWork
       ? {
           prTitle: variant.prTitle,
@@ -694,16 +830,23 @@ export function projectView(
               : state.variables.hasTest === true && scenario.testFile
                 ? [...variant.files, scenario.testFile]
                 : variant.files,
-          checks: track === "engineering" && state.variables.hasTest === true ? variant.checks : [],
+          checks:
+            track === "engineering" && (state.variables.hasTest === true || (artifactKind !== null && artifactKind !== "code"))
+              ? variant.checks
+              : [],
           demo: track === "product" ? variant.demo : [],
           reasons: track === "product" ? scenario.reviewReasons : [],
+          noteOptions:
+            state.stageId === "review" && state.status === "active"
+              ? buildReviewNoteOptions(scenario, explanationItems)
+              : [],
           reviews: memo.reviews.map((review) => {
             const concept = scenario.concepts?.find((item) => item.id === review.explanation?.concept);
             const feedback = concept && review.explanation ? explanationFeedback(scenario, concept, review.explanation.covered) : null;
             return {
               label:
                 track === "engineering"
-                  ? `${review.path}, line ${review.line}`
+                  ? entryLabel(review.path, review.line)
                   : (reasonLabel(review.reasonId) ?? "Request changes"),
               correct: review.correct,
               ...(concept && feedback ? { explained: { concept: concept.name, rating: feedback.rating, feedback: feedback.text } } : {}),

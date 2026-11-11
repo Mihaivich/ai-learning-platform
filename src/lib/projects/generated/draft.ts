@@ -46,6 +46,33 @@ const deliverable = z.object({
 
 const choice = z.object({ label: text(120), feedback: text(300) });
 
+const artifactVariant = z.object({
+  lines: z.array(text(220)).min(4).max(6).describe("4 to 6 entries: pipe-separated cells for table, clauses for document, or ordered steps for steps."),
+  flawedLine: z.number().int().min(1).max(6).describe("1-based index of the flawed or out-of-scope entry."),
+});
+
+/**
+ * A universal specialist artifact so any subject — data, business, law, humanities,
+ * or lab science — gets line/row/clause-level review without custom code per profession.
+ */
+export const draftArtifactSchema = z.object({
+  kind: z.enum(["table", "document", "steps"]).describe("Choose table for data/finance/stats, document for policies/copy/essays/law, steps for lab protocols/workflows."),
+  fileName: text(60).describe('Short file name, such as "ward-audit.xlsx", "loyalty-terms.md", or "nitrate-assay.sop".'),
+  columns: z.array(text(40)).min(2).max(5).optional().describe("Column headers when kind is table. Every line must have the same number of | cells."),
+  check: z
+    .object({
+      label: text(140).describe("What the brief can ask the assistant to verify, such as a reconciliation check or control check."),
+      cues: z.array(z.array(cue).min(1).max(8)).min(1).max(2),
+      passedDetail: text(160).describe("Verification summary shown when the check passes."),
+      failedDetail: text(160).describe("Verification summary shown when the core problem version fails the check."),
+    })
+    .optional(),
+  good: z.array(text(220)).min(4).max(6).describe("4 to 6 sound entries with no flaw."),
+  missesProblem: artifactVariant.describe("Entries when the problem constraint is missing; flawedLine points at the problem entry."),
+  missesRule: artifactVariant.describe("Entries when the rule constraint is missing; flawedLine points at the rule-breaking entry."),
+  scopeCreep: artifactVariant.describe("Entries when the scope constraint is missing; flawedLine points at the out-of-scope entry."),
+});
+
 /**
  * A subject concept the job depends on. The assistant's flawed version acts on
  * the misconception, so the learner understands the concept by catching it.
@@ -86,6 +113,11 @@ export const projectDraftSchema = z.object({
   assistant: z.object({
     name: text(24).describe("The AI teammate's first name."),
     kind: text(40).describe('What it is, such as "AI copywriting agent".'),
+    workSteps: z
+      .array(text(80))
+      .length(3)
+      .optional()
+      .describe('Three short progress phrases in this field, such as ["cleaning occupancy records", "stratifying risk cohorts", "building Excel summary"].'),
   }),
   manager: z.object({ name: text(40), note: text(300).describe("The manager's email: two weeks of budget, the assistant is free to use.") }),
   user: z.object({
@@ -168,6 +200,14 @@ export const projectDraftSchema = z.object({
     })
     .optional()
     .describe("Required when the job teaches a subject."),
+  artifact: draftArtifactSchema
+    .optional()
+    .describe("Optional structured deliverable (table, document or steps) enabling entry-by-entry specialist review in any domain."),
+  viva: z
+    .object({
+      question: text(260).describe("A pointed sign-off defense question from the client right before launch, asking why this approach is sound without naming the concepts."),
+    })
+    .optional(),
   samples: z
     .object({
       requirements: text(1500).describe("Model requirements covering all five items, using their cues."),

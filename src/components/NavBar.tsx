@@ -61,7 +61,10 @@ export function NavBar() {
         </Link>
         <div className="ml-auto flex items-center gap-1 text-sm sm:gap-3 lg:text-[15px]">
           <Link href="/projects" className={navLink}>
-            Projects
+            Courses
+          </Link>
+          <Link href="/projects/new" className={navLink}>
+            Create
           </Link>
           {user && teacher && (
             <Link href="/teach" className={navLink}>

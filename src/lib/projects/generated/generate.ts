@@ -114,6 +114,15 @@ Concept missions. When a subject is given, the job teaches it:
   It shows the confident result and its consequence, and the learner works out why.
 Without a subject, concepts are optional: name the real concepts behind the problem and the rule if there are clear ones.
 
+Universal domain support (works for ANY subject — sciences, business, humanities, law, healthcare, or computing):
+- Give assistant.workSteps three short domain-appropriate actions (e.g. ["cleaning occupancy logs", "stratifying risk groups", "formatting audit sheet"]), never coding jargon unless the domain is software.
+- Include "artifact" so learners can also inspect the actual deliverable entry by entry:
+  pick kind "table" for numbers/statistics/economics/accounting (provide columns and pipe-separated "|" cells on every row matching columns.length),
+  "document" for law/ethics/history/policy/marketing/writing (4-6 numbered clauses or paragraphs),
+  or "steps" for chemistry/biology/clinical/operations protocols (4-6 ordered procedure steps).
+  In missesProblem, missesRule and scopeCreep, set flawedLine (1-based) to the single entry carrying that version's flaw or scope creep, without using tell-words ("because", "fails to", "ignoring").
+- Include viva.question: one pointed sign-off question in the client's voice asking what could go wrong and how the rollout verifies success, without naming the concepts.
+
 Counts: exactly 3 vagueReplies; exactly 3 demo steps per deliverable; 4 to 12 cues per fact;
 1 or 2 cue groups per checklist item, each with 1 to 10 alternatives.
 

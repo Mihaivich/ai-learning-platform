@@ -16,7 +16,11 @@ async function framing(scenarioId: string) {
   // The owner's own project, or an instructor's project assigned to the student's class.
   const data = await loadPlayableListing(scenarioId, auth.user.id);
   if (!data) return null;
-  const exit = data.pathId ? { href: `/paths/${data.pathId}`, label: "Back to your path" } : data.own ? undefined : { href: "/projects", label: "Back to your classes" };
+  const exit = data.pathId
+    ? { href: `/paths/${data.pathId}`, label: "Back to your path" }
+    : data.own
+      ? undefined
+      : { href: "/projects", label: data.isPublic ? "Back to all courses" : "Back to your classes" };
   return { title: data.title, summary: data.summary, exit };
 }
 

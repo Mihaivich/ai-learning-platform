@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ProjectView } from "@/lib/projects/runtime";
 import { AppIcon, Avatar } from "./icons";
 import { CAST_TONE, guideFor, initials, stepIndex, stepsFor, type AppId, type Send } from "./config";
@@ -13,6 +14,14 @@ export function Briefing({ view, busy, send, summary }: { view: ProjectView; bus
           <p className="text-[12px] font-semibold uppercase tracking-wide text-orange-600">New job · two weeks</p>
           <h1 id="briefing-title" className="mt-1 text-2xl font-bold text-stone-900">{view.scenario.title}</h1>
           <p className="mt-2 text-[14px] leading-relaxed text-stone-700">{summary}</p>
+          {view.conceptCount > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50/70 px-3.5 py-2 text-[12.5px] text-teal-950">
+              <span>New to the subject? Warm up with the 3-minute visual primer &amp; spot-the-trap mini-game first.</span>
+              <Link href={`/projects/${view.scenario.id}/learn`} className="font-semibold text-teal-800 underline hover:text-teal-600">
+                Open mini-course warm-up →
+              </Link>
+            </div>
+          )}
         </div>
         <div className="grid gap-3 px-6 py-5 sm:grid-cols-2">
           {view.scenario.cast.map((person) => (
@@ -163,6 +172,19 @@ export function Report({ view, busy, onClose, onRestart, exit }: { view: Project
             </div>
           </div>
         )}
+        {view.viva?.response && (
+          <div className="border-t border-black/10 px-6 py-5 text-[13px]">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[15px] font-semibold text-stone-900">Sign-off defense (Live Viva)</h2>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${RATING[view.viva.response.rating]}`}>
+                {view.viva.response.rating}
+              </span>
+            </div>
+            <p className="mt-1.5 text-stone-600">&ldquo;{view.viva.question}&rdquo;</p>
+            <p className="mt-2 rounded-lg border border-black/10 bg-stone-50 p-3 italic text-stone-800">&ldquo;{view.viva.response.text}&rdquo;</p>
+            <p className="mt-2 text-stone-700">{view.viva.response.feedback}</p>
+          </div>
+        )}
         <div className="flex flex-wrap justify-end gap-2 border-t border-black/10 px-6 py-4">
           <a href={exit.href} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">{exit.label}</a>
           <button type="button" onClick={onClose} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">Look around</button>
@@ -206,8 +228,17 @@ export function Notifications({ notices, onOpen, onDismiss }: { notices: Notice[
 export function ProjectWidget({ view, onOpenApp }: { view: ProjectView; onOpenApp: (app: AppId) => void }) {
   const current = stepIndex(view);
   const steps = stepsFor(view);
-  // Generated projects have one way in, so there is no product/tech split to name.
-  const role = view.track === "engineering" ? "Tech lead" : view.scenario.id.startsWith("gen-") ? "Project lead" : "Product lead";
+  const isCode = !view.scenario.artifactKind || view.scenario.artifactKind === "code";
+  const role =
+    view.track === "engineering"
+      ? isCode
+        ? "Tech lead"
+        : "Specialist reviewer"
+      : view.scenario.id.startsWith("gen-") && !view.scenario.artifactKind
+        ? "Project lead"
+        : isCode
+          ? "Product lead"
+          : "Overview lead";
   const { effort, effortMax, trust } = view.meters;
   const guide = guideFor(view);
   return (

@@ -9,6 +9,7 @@ import { loadProjectScenario } from "@/lib/projects";
 import { enforceQuota } from "@/lib/ai/quota";
 import { aiEvaluator } from "@/lib/projects/ai-evaluator";
 import {
+  answerViva,
   askClient,
   chooseAction,
   endInterview,
@@ -40,6 +41,7 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("end-interview") }),
   z.object({ op: z.literal("requirements"), text: z.string().max(10000) }),
   z.object({ op: z.literal("brief"), text: z.string().max(10000) }),
+  z.object({ op: z.literal("viva"), text: z.string().max(4000) }),
   z.object({
     op: z.literal("request-changes"),
     reasonId: z.string().max(120).optional(),
@@ -271,6 +273,9 @@ export async function POST(
         break;
       case "brief":
         step = await submitBrief(scenario, state, body.text, evaluator);
+        break;
+      case "viva":
+        step = await answerViva(scenario, state, body.text, evaluator);
         break;
       case "request-changes":
         step = await sendBack(scenario, state, body, evaluator);
