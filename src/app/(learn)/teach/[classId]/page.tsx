@@ -5,6 +5,8 @@ import { glass } from "@/components/home/glass";
 import { Reveal } from "@/components/home/Reveal";
 import { AssignProjects } from "@/components/teach/AssignProjects";
 import { RemoveStudent } from "@/components/teach/RemoveStudent";
+import { ImportStudents } from "@/components/teach/ImportStudents";
+import { pendingStudents } from "@/lib/class-roster";
 import { assignableFor, classProgress, loadOwnClass, type RunSummary } from "@/lib/classes";
 import type { ConceptResult } from "@/lib/projects/runtime";
 import { instructor } from "@/lib/instructor";
@@ -79,7 +81,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   if (!teacher) notFound();
   const owned = await loadOwnClass(teacher.db, teacher.user.id, classId);
   if (!owned) notFound();
-  const [students, assignable] = await Promise.all([classProgress(teacher.user.id, owned.members, owned.projects), assignableFor(teacher.db)]);
+  const [students, assignable, pending] = await Promise.all([classProgress(teacher.user.id, owned.members, owned.projects), assignableFor(teacher.db), pendingStudents(teacher.db, owned.id)]);
   const titles = new Map(assignable.map((project) => [project.id, project.title]));
 
   return (
@@ -121,7 +123,8 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
             })}
           </ul>
         )}
-        {!students.length && <p className="mt-3 text-white/50">Nobody has joined yet. Share the code above.</p>}
+        <ImportStudents classId={owned.id} pending={pending} />
+        {!students.length && <p className="mt-3 text-white/50">Nobody has joined yet. Import a list or share the code above.</p>}
         <ul className="mt-5 space-y-4">
           {students.map((student) => (
             <li key={student.id} className={`${glass} p-6`}>
