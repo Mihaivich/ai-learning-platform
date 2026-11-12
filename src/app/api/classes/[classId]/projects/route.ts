@@ -3,7 +3,7 @@ import { assignableFor, assignProjects, loadOwnClass } from "@/lib/classes";
 import { apiError, HttpError, requireAccount } from "@/lib/supabase/server";
 
 /* Sets which projects the class is assigned: built-in ones, or the instructor's own. */
-const bodySchema = z.object({ projects: z.array(z.string().max(64)).max(20) });
+const bodySchema = z.object({ projects: z.array(z.string().max(64)).max(20), expectedVersion: z.number().int().min(0).max(2147483647) });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ classId: string }> }) {
   try {
@@ -13,8 +13,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ classId:
     if (!parsed.success) throw new HttpError(400, "That list of projects is not valid.");
     if (!(await loadOwnClass(db, user.id, classId))) throw new HttpError(404, "That class doesn't exist.");
     const allowed = (await assignableFor(db)).map((project) => project.id);
-    const projects = await assignProjects(db, classId, parsed.data.projects, allowed);
-    return Response.json({ projects });
+    const result = await assignProjects(db, classId, parsed.data.projects, allowed, parsed.data.expectedVersion);
+    return Response.json(result);
   } catch (error) {
     return apiError(error);
   }

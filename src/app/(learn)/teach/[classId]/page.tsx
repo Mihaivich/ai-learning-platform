@@ -99,7 +99,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
           Students see these under the class on their Projects page. Projects you <Link href="/teach/projects" className="underline hover:text-white">create or customise</Link> appear here too.
         </p>
         <div className="mt-4">
-          <AssignProjects classId={owned.id} projects={assignable} assigned={owned.projects} />
+          <AssignProjects key={owned.id} classId={owned.id} projects={assignable} assigned={owned.projects} version={owned.projects_version} />
         </div>
       </section>
 
