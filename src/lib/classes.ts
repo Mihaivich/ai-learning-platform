@@ -210,6 +210,10 @@ export async function joinClass(db: SupabaseClient, code: string) {
 
 /** The classes the student is in, with their assigned projects. */
 export async function studentClasses(db: SupabaseClient, studentId: string) {
+  // The RPC takes no caller-supplied identity: it claims only this session's
+  // verified email, then the existing member-scoped reads work unchanged.
+  const { error: claimError } = await db.rpc("claim_class_invitations");
+  if (claimError) throw new HttpError(503, "Could not check your class invitations. Please reload Projects.");
   const { data: memberships } = await db.from("class_members").select("class_id").eq("student_id", studentId);
   const classIds = (memberships ?? []).map((row) => row.class_id as string);
   if (!classIds.length) return [];
