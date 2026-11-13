@@ -5,7 +5,7 @@ import {
   simulationConditionSchema,
   simulationConfigSchema,
 } from "@/lib/learning/simulation/schema";
-import type { ChecklistItem, CodeFile, CodeVariant, ProjectFact, ProjectScenario } from "../types";
+import type { ArtifactKind, ChecklistItem, CodeFile, CodeVariant, ProjectFact, ProjectScenario } from "../types";
 import type { FactRole, ProjectDraft } from "./draft";
 
 /*
@@ -65,15 +65,59 @@ export type EngineeringDraft = {
 /** Bump when the structure below changes, so runs built on the old one restart. */
 export const TEMPLATE_VERSION = 1;
 
+const ARTIFACT_NOUN: Record<ArtifactKind, string> = {
+  code: "pull request",
+  table: "data sheet",
+  document: "draft document",
+  steps: "protocol",
+};
+
+function specialistFromArtifact(draft: ProjectDraft): Record<keyof typeof VARIANTS, Pick<CodeVariant, "files" | "problemLines" | "checks">> | null {
+  const artifact = draft.artifact;
+  if (!artifact) return null;
+  const file = (lines: string[]): CodeFile => ({
+    path: artifact.fileName,
+    kind: artifact.kind,
+    ...(artifact.columns ? { columns: artifact.columns } : {}),
+    lines,
+  });
+  const checkName = artifact.fileName;
+  const passCheck = artifact.check ? [{ name: checkName, passed: true, detail: artifact.check.passedDetail }] : [];
+  const failCheck = artifact.check ? [{ name: checkName, passed: false, detail: artifact.check.failedDetail }] : [];
+  return {
+    good: { files: [file(artifact.good)], problemLines: [], checks: passCheck },
+    missesProblem: {
+      files: [file(artifact.missesProblem.lines)],
+      problemLines: [{ path: artifact.fileName, line: artifact.missesProblem.flawedLine }],
+      checks: failCheck,
+    },
+    missesRule: {
+      files: [file(artifact.missesRule.lines)],
+      problemLines: [{ path: artifact.fileName, line: artifact.missesRule.flawedLine }],
+      checks: passCheck,
+    },
+    scopeCreep: {
+      files: [file(artifact.scopeCreep.lines)],
+      problemLines: [{ path: artifact.fileName, line: artifact.scopeCreep.flawedLine }],
+      checks: passCheck,
+    },
+  };
+}
+
 export function buildScenario(draft: ProjectDraft, meta: { id: string; version?: number }, engineering?: EngineeringDraft): ProjectScenario {
   const client = firstName(draft.client.name);
   const agent = draft.assistant.name;
+  const deliverable = draft.deliverable ?? "the work";
+  const artifactCode = engineering?.code ?? specialistFromArtifact(draft);
+  const artifactKind: ArtifactKind | undefined = engineering ? "code" : draft.artifact?.kind;
+  const hasSpecialist = Boolean(artifactCode && artifactKind);
 
   const facts: ProjectFact[] = (Object.keys(FACT_IDS) as FactRole[]).map((role) => ({
     id: FACT_IDS[role],
     text: draft.facts[role].text,
     cues: draft.facts[role].cues,
     reply: draft.facts[role].reply,
+    question: draft.facts[role].sampleQuestion,
   }));
 
   const requirements: ChecklistItem[] = [
@@ -97,12 +141,32 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     id: VARIANTS[key],
     prTitle: draft.deliverables[key].title,
     prSummary: draft.deliverables[key].summary,
-    files: engineering?.code[key].files ?? [],
-    problemLines: engineering?.code[key].problemLines ?? [],
+    files: artifactCode?.[key].files ?? [],
+    problemLines: artifactCode?.[key].problemLines ?? [],
     problemReason,
     demo: draft.deliverables[key].demo,
-    checks: engineering?.code[key].checks ?? [],
+    checks: artifactCode?.[key].checks ?? [],
   });
+
+  const vivaRiskCues = [
+    ...draft.facts.problem.cues,
+    ...draft.facts.rule.cues,
+    ...(draft.concepts ? [...draft.concepts.problem.cues, ...draft.concepts.rule.cues] : []),
+  ];
+  const vivaVerifyCues = [
+    ...draft.facts.success.cues,
+    "pilot",
+    "trial",
+    "measure",
+    "count",
+    "track",
+    "target",
+    "week",
+    "month",
+    "rate",
+    "verify",
+    "check",
+  ];
 
   return {
     id: meta.id,
@@ -110,20 +174,33 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     title: draft.title,
     tagline: draft.tagline,
     summary: draft.summary,
+    domain: draft.domain,
     client: draft.client,
     assistant: draft.assistant,
+    ...(artifactKind ? { artifactKind } : {}),
     cast: [
-      { kind: "client", name: draft.client.name, role: `${draft.client.role}, ${draft.client.organisation}`, note: "Your client. Knows the business, and only tells you what you ask about." },
+      { kind: "client", name: draft.client.name, role: `${draft.client.role}, ${draft.client.organisation}`, note: "Your client. Knows the domain context, and only tells you what you ask about." },
       { kind: "manager", name: draft.manager.name, role: "Your manager", note: "Gave this job two weeks. Watches the budget." },
       { kind: "assistant", name: agent, role: draft.assistant.kind, note: "Does exactly what you ask, fast. Never asks a clarifying question." },
       { kind: "users", name: draft.user.from, role: "Will use the result", note: "Lives with whatever you ship, and is the first to notice what you missed." },
     ],
-    words: { deliverable: draft.deliverable ?? "the work", manager: draft.manager.name },
+    words: { deliverable, manager: draft.manager.name },
     concepts: draft.concepts
       ? (["problem", "rule"] as const).map((role) => {
-          const { name, explanation, bridge, misconception, inTheJob, cues } = draft.concepts![role];
+          const { name, explanation, bridge, misconception, inTheJob, cues, diagram } = draft.concepts![role];
           const variant = role === "problem" ? VARIANTS.missesProblem : VARIANTS.missesRule;
-          return { id: `K-${role}`, fact: FACT_IDS[role], name, explanation, bridge, misconception, inTheJob, variant, cues };
+          return {
+            id: `K-${role}`,
+            fact: FACT_IDS[role],
+            name,
+            explanation,
+            bridge,
+            misconception,
+            inTheJob,
+            variant,
+            cues,
+            ...(diagram ? { diagram } : {}),
+          };
         })
       : undefined,
     reportNotes: engineering ? { ...draft.reportNotes, testAsked: engineering.test.asked } : draft.reportNotes,
@@ -149,6 +226,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
         "changes-wrong": draft.trust.wrongReview,
         "release-measure": draft.trust.measured,
         "release-now": draft.trust.releaseNow,
+        "viva-strong": `${client} appreciated your clear sign-off explanation before rollout.`,
       },
       outcome: {
         success: { delta: 1, reason: draft.trust.success },
@@ -177,6 +255,15 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
       { id: "distractor", label: draft.reviewReasons.distractor },
     ],
     ...(engineering ? { testFile: engineering.test.file } : {}),
+    viva: {
+      question:
+        draft.viva?.question ??
+        `Before we roll ${deliverable} out at ${draft.client.organisation}: in plain words, what is the main trap ${agent} could fall into on this job, and how will we verify the rollout worked?`,
+      items: [
+        { id: "V1", label: "Names the core problem or rule that must be respected in this job", competency: "discernment", cues: [[...new Set(vivaRiskCues)]] },
+        { id: "V2", label: "Explains how the release will pilot or measure whether it worked", competency: "diligence", cues: [[...new Set(vivaVerifyCues)]] },
+      ],
+    },
     stageKinds: {
       "choose-track": "choice",
       inbox: "choice",
@@ -190,7 +277,11 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     trackNarratives: {
       review: {
         product: `${agent} has finished and recorded a short walkthrough. Look at it as ${client} would, then approve it or send it back with a reason.`,
-        ...(engineering ? { engineering: `${agent} has opened a pull request. Read the diff and the checks. Approve it, or point at the line that's wrong and request changes.` } : {}),
+        ...(engineering
+          ? { engineering: `${agent} has opened a pull request. Read the diff and the checks. Approve it, or point at the line that's wrong and request changes.` }
+          : artifactKind
+            ? { engineering: `${agent} has delivered the ${ARTIFACT_NOUN[artifactKind]}. Inspect each entry carefully. Approve it, or click the entry that is wrong and send it back.` }
+            : {}),
       },
     },
     debriefNotes: {
@@ -230,20 +321,20 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
         persona: `${draft.client.name}, ${draft.client.role}.`,
       },
       variables: [
-        { id: "track", type: "enum", label: "Track", initial: "unset", options: engineering ? ["unset", "product", "engineering"] : ["unset", "product"], visible: false },
+        { id: "track", type: "enum", label: "Track", initial: "unset", options: hasSpecialist ? ["unset", "product", "engineering"] : ["unset", "product"], visible: false },
         { id: "trust", type: "number", label: "Client trust", initial: 5, min: 0, max: 10, visible: true, description: `How much ${client} trusts you to deliver what they need.` },
         { id: "effort", type: "number", label: "Days used", initial: 0, min: 0, max: 10, unit: "of 10", visible: true, description: "You can spend two working weeks on this job." },
         { id: "hasMetric", type: "boolean", label: "Has a success measure", initial: false, visible: false },
         { id: "variant", type: "enum", label: "Delivered version", initial: "none", options: ["none", ...Object.values(VARIANTS)], visible: false },
-        { id: "hasTest", type: "boolean", label: "Has a test", initial: false, visible: false },
+        { id: "hasTest", type: "boolean", label: "Has a test", initial: Boolean(!engineering && draft.artifact?.check), visible: false },
         { id: "release", type: "enum", label: "Release", initial: "none", options: ["none", "plain", "pilot", "measured"], visible: false },
       ],
       startStage: "choose-track",
       stages: [
         {
           id: "choose-track",
-          title: engineering ? "Choose your role" : "Your role",
-          narrative: engineering ? `${draft.learnerRole} Same project, two ways in. Pick the role that fits you. You can try the other one later.` : draft.learnerRole,
+          title: hasSpecialist ? "Choose your role" : "Your role",
+          narrative: hasSpecialist ? `${draft.learnerRole} Same project, two ways in. Pick the role that fits you. You can try the other one later.` : draft.learnerRole,
           actions: engineering
             ? [
                 {
@@ -263,16 +354,35 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
                   nextStage: "inbox",
                 },
               ]
-            : [
-                {
-                  id: "pick-product",
-                  label: "Start the job",
-                  description: `You'll judge ${agent}'s work by what it does for ${client}.`,
-                  effects: [{ op: "set", variable: "track", value: "product" }],
-                  feedback: `You lead the job. You'll judge ${agent}'s work by what it does for ${client}.`,
-                  nextStage: "inbox",
-                },
-              ],
+            : hasSpecialist && artifactKind
+              ? [
+                  {
+                    id: "pick-product",
+                    label: "Overview mode",
+                    description: `Review a plain-English walkthrough of how ${deliverable} works for ${client}.`,
+                    effects: [{ op: "set", variable: "track", value: "product" }],
+                    feedback: `You chose overview mode. You'll judge ${agent}'s work by what happens when ${client}'s team uses it.`,
+                    nextStage: "inbox",
+                  },
+                  {
+                    id: "pick-engineering",
+                    label: "Specialist review",
+                    description: `Inspect ${agent}'s ${ARTIFACT_NOUN[artifactKind]} entry by entry and flag what goes wrong.`,
+                    effects: [{ op: "set", variable: "track", value: "engineering" }],
+                    feedback: `You chose specialist review. You'll audit ${agent}'s ${ARTIFACT_NOUN[artifactKind]} directly.`,
+                    nextStage: "inbox",
+                  },
+                ]
+              : [
+                  {
+                    id: "pick-product",
+                    label: "Start the job",
+                    description: `You'll judge ${agent}'s work by what it does for ${client}.`,
+                    effects: [{ op: "set", variable: "track", value: "product" }],
+                    feedback: `You lead the job. You'll judge ${agent}'s work by what it does for ${client}.`,
+                    nextStage: "inbox",
+                  },
+                ],
         },
         {
           id: "inbox",

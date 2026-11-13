@@ -3,8 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { glass } from "@/components/home/glass";
 import { Reveal } from "@/components/home/Reveal";
+import { ClassStudentQuotaChart, HourlyUsageChart } from "@/components/quota/QuotaCharts";
 import { AssignProjects } from "@/components/teach/AssignProjects";
+import { ClassQuotaSettings } from "@/components/teach/ClassQuotaSettings";
 import { RemoveStudent } from "@/components/teach/RemoveStudent";
+import { loadClassStudentQuotaUsage } from "@/lib/ai/quota";
 import { assignableFor, classProgress, loadOwnClass, type RunSummary } from "@/lib/classes";
 import type { ConceptResult } from "@/lib/projects/runtime";
 import { instructor } from "@/lib/instructor";
@@ -29,7 +32,6 @@ const CONCEPT: Record<ConceptResult["outcome"], { label: string; className: stri
 const RATING: Record<string, string> = { strong: "explained well", mixed: "partly explained", weak: "not explained" };
 
 function when(iso: string) {
-  // Rendered on the server, whose clock is UTC on Vercel; the class is in Hong Kong.
   return new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Hong_Kong" });
 }
 
@@ -38,7 +40,6 @@ function Concepts({ run }: { run: Extract<RunSummary, { status: "active" | "comp
   return (
     <ul className="mt-2 space-y-1 text-sm">
       {run.concepts.map((concept) => {
-        // Until the run ends, only what the brief or a send-back settled is final.
         const settled = run.status === "completed" || concept.outcome === "prevented" || concept.outcome === "caught";
         const shown = settled ? CONCEPT[concept.outcome] : { label: "Not decided yet", className: "text-white/50" };
         return (
@@ -79,7 +80,13 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   if (!teacher) notFound();
   const owned = await loadOwnClass(teacher.db, teacher.user.id, classId);
   if (!owned) notFound();
-  const [students, assignable] = await Promise.all([classProgress(teacher.user.id, owned.members, owned.projects), assignableFor(teacher.db)]);
+  const [students, assignable] = await Promise.all([
+    classProgress(teacher.user.id, owned.members, owned.projects),
+    assignableFor(teacher.db),
+  ]);
+  const classUsage = await loadClassStudentQuotaUsage(
+    students.map((s) => ({ id: s.id, name: s.name, email: s.email })),
+  );
   const titles = new Map(assignable.map((project) => [project.id, project.title]));
 
   return (
@@ -89,18 +96,33 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
         <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{owned.name}</h1>
         <div className={`${glass} mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 p-6`}>
           <p className="font-mono text-3xl tracking-[0.3em]">{owned.join_code}</p>
-          <p className="text-white/60">Students open Projects, choose “Join a class” and enter this code.</p>
+          <p className="text-white/60">Students open Courses, choose “Join a class” and enter this code.</p>
         </div>
       </Reveal>
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Assigned projects</h2>
         <p className="mt-1 text-sm text-white/55">
-          Students see these under the class on their Projects page. Projects you <Link href="/teach/projects" className="underline hover:text-white">create or customise</Link> appear here too.
+          Students see these under the class on their Courses page. Projects you <Link href="/teach/projects" className="underline hover:text-white">create or customise</Link> appear here too.
         </p>
         <div className="mt-4">
           <AssignProjects classId={owned.id} projects={assignable} assigned={owned.projects} />
         </div>
+      </section>
+
+      <section className="mt-12 space-y-5">
+        <div>
+          <h2 className="text-xl font-semibold">Class AI Quota &amp; Usage Analytics</h2>
+          <p className="mt-1 text-sm text-white/55">
+            Control how many AI requests students in this class may make per hour, and monitor live class usage.
+          </p>
+        </div>
+        <ClassQuotaSettings classId={owned.id} initial={owned.quotas} />
+        <HourlyUsageChart
+          hourly={classUsage.hourly}
+          title="Class-wide student AI requests (last 24h)"
+        />
+        <ClassStudentQuotaChart students={classUsage.students} classQuotas={owned.quotas} />
       </section>
 
       <section className="mt-12">

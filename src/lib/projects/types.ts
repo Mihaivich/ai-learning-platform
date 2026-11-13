@@ -2,6 +2,7 @@ import type { SimulationConfig, SimulationOutcome } from "@/lib/learning/simulat
 
 export type Competency = "delegation" | "description" | "discernment" | "diligence";
 export type Track = "product" | "engineering";
+export type ArtifactKind = "code" | "table" | "document" | "steps";
 
 /** How the workspace renders a stage. The engine itself only sees stage ids. */
 export type StageKind =
@@ -20,6 +21,8 @@ export type ProjectFact = {
   cues: string[];
   /** What the client says when the fact comes up, in their own voice. */
   reply: string;
+  /** Natural one-click question prompt shown in the call UI without revealing the answer. */
+  question?: string;
 };
 
 /**
@@ -47,7 +50,11 @@ export type InboxMessage = {
 
 export type CodeFile = {
   path: string;
-  /** Shown as the pull request diff: every line is an added line. */
+  /** How Review renders the file: code diff (default), spreadsheet table, clause document, or protocol steps. */
+  kind?: ArtifactKind;
+  /** Column headers when kind === "table"; each line is pipe-separated cells. */
+  columns?: string[];
+  /** Shown as the pull request diff or structured entries: every entry is 1-based indexed. */
   lines: string[];
 };
 
@@ -85,6 +92,31 @@ export type CastMember = {
   note: string;
 };
 
+export type DiagramNodeTone = "neutral" | "trap" | "sound" | "accent";
+export type DiagramLane = "shared" | "trap" | "sound";
+
+export type DiagramNode = {
+  id: string;
+  label: string;
+  detail?: string;
+  tone: DiagramNodeTone;
+  /** Comparison lens lane: shared (shown in all views), trap (naive misconception), or sound (calibrated fix). */
+  lane?: DiagramLane;
+};
+
+export type DiagramEdge = {
+  from: string;
+  to: string;
+  label?: string;
+  style?: "solid" | "dashed";
+};
+
+export type StructuredDiagram = {
+  caption: string;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+};
+
 /**
  * A concept the job depends on, explained in the report. It counts as found when the learner
  * uncovers its fact on the call.
@@ -104,6 +136,8 @@ export type ProjectConcept = {
   variant: string;
   /** Words that show the learner's explanation is about this concept. Used offline. */
   cues: string[];
+  /** Optional structured node-edge diagram rendered as SVG in the Visual Primer. */
+  diagram?: StructuredDiagram;
 };
 
 /** A short email that follows from the learner's first move. */
@@ -116,9 +150,12 @@ export type ProjectScenario = {
   title: string;
   tagline: string;
   summary: string;
+  domain?: string;
   client: { name: string; role: string; organisation: string; persona: string };
   /** The AI teammate who builds the work ("Cody, AI coding agent"). */
-  assistant: { name: string; kind: string };
+  assistant: { name: string; kind: string; workSteps?: string[] };
+  /** The representation used on the specialist review track; defaults to "code" when files are present. */
+  artifactKind?: ArtifactKind;
   cast: CastMember[];
   /** Short phrases the desktop's wording is built from. */
   words: {
@@ -165,8 +202,13 @@ export type ProjectScenario = {
   variantRules: { missing: string; variant: string; action: string }[];
   defaultVariant: { variant: string; action: string };
   variants: CodeVariant[];
-  /** Added to the pull request when the brief asked for a test. */
+  /** Added to the pull request or specialist deliverable when the brief asked for a check/test. */
   testFile?: CodeFile;
+  /** Optional sign-off defense (mock interview) asked by the client right before launch. */
+  viva?: {
+    question: string;
+    items: ChecklistItem[];
+  };
   reviewReasons: ReviewReason[];
   stageKinds: Record<string, StageKind>;
   /** Track-specific wording for a stage, shown instead of the engine narrative. */

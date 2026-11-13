@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FeedbackTrigger } from "@/components/feedback/FeedbackButton";
 import { useAuth } from "@/lib/auth-store";
 import { play, readSoundSetting, unlockSound, writeSoundSetting } from "@/lib/sound";
 import type { ProjectView } from "@/lib/projects/runtime";
@@ -291,22 +292,35 @@ export function Desktop({
         ) : (
           <span className="hidden truncate text-stone-700 sm:inline">{view.scenario.title}</span>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            writeSoundSetting(!sound);
-            setSound(!sound);
-          }}
-          aria-label={sound ? "Mute sounds" : "Turn sounds on"}
-          aria-pressed={!sound}
-          title={sound ? "Mute sounds" : "Turn sounds on"}
-          className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded text-stone-800 hover:bg-white/50"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />
-            {sound ? <path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" />}
-          </svg>
-        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <FeedbackTrigger
+            projectId={scenarioId}
+            surface="desktop"
+            targetId={view.stage.id}
+            targetLabel={focused ? `${appName(focused, view)} (${view.stage.title})` : view.stage.title}
+            defaultKind="content_error"
+            label="Feedback"
+            tone="light"
+            compact
+            context={{ stage: view.stage.id, track: view.track, focusedApp: focused }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              writeSoundSetting(!sound);
+              setSound(!sound);
+            }}
+            aria-label={sound ? "Mute sounds" : "Turn sounds on"}
+            aria-pressed={!sound}
+            title={sound ? "Mute sounds" : "Turn sounds on"}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded text-stone-800 hover:bg-white/50"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />
+              {sound ? <path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" />}
+            </svg>
+          </button>
+        </div>
         <span className="shrink-0 whitespace-nowrap tabular-nums text-stone-800">
           {view.status === "completed" ? "Job finished" : `Day ${day} of ${view.meters.effortMax}`}
         </span>

@@ -99,6 +99,7 @@ export const harbourClinic: ProjectScenario = {
       "Grace Wong, practice manager at Harbour Family Clinic, a small family clinic. Friendly, busy and not technical. Speaks in short, natural sentences, sometimes mentions patients or staff by name. Cares about the budget and about not upsetting patients. Describes solutions ('an app like the big clinics') rather than problems unless asked good questions.",
   },
   assistant: { name: "Cody", kind: "AI coding agent" },
+  artifactKind: "code",
   cast: [
     { kind: "client", name: "Grace Wong", role: "Practice manager, Harbour Family Clinic", note: "Your client. Busy, not technical, knows how the front desk really works." },
     { kind: "manager", name: "Leo", role: "Your manager at the studio", note: "Gave this job two weeks. Watches the budget." },
@@ -117,6 +118,22 @@ export const harbourClinic: ProjectScenario = {
       inTheJob: "Mandy and Kit book in the morning rush, often within seconds of each other. A safeguard only counts if it holds when they save at the same moment, not just one after the other.",
       variant: "race",
       cues: ["same time", "same moment", "both", "at once", "simultaneous", "race"],
+      diagram: {
+        caption: "Two receptionists click Save on 09:00 Dr Lee in the same second",
+        nodes: [
+          { id: "rush", label: "Simultaneous click", detail: "Mandy & Kit both book 09:00", tone: "neutral", lane: "shared" },
+          { id: "check-first", label: "Check then insert", detail: "Both read slot = free", tone: "trap", lane: "trap" },
+          { id: "double-booked", label: "Double booking ships", detail: "Two patients arrive at 09:00", tone: "trap", lane: "trap" },
+          { id: "unique-idx", label: "Atomic DB unique index", detail: "Single-step constraint on slot", tone: "accent", lane: "sound" },
+          { id: "safe-slot", label: "One wins, one notified", detail: "Second save cleanly refused", tone: "sound", lane: "sound" },
+        ],
+        edges: [
+          { from: "rush", to: "check-first", label: "Naive gap" },
+          { from: "check-first", to: "double-booked", label: "Both write" },
+          { from: "rush", to: "unique-idx", label: "Atomic rule" },
+          { from: "unique-idx", to: "safe-slot", label: "Enforced" },
+        ],
+      },
     },
     {
       id: "K-rule",
@@ -128,6 +145,22 @@ export const harbourClinic: ProjectScenario = {
       inTheJob: "The clinic is checked by auditors and has to keep its appointment history. Watch what happens to an appointment when it is cancelled.",
       variant: "delete-on-cancel",
       cues: ["delete", "record", "history", "audit", "keep", "seven years"],
+      diagram: {
+        caption: "What happens in storage when a booked slot is cancelled",
+        nodes: [
+          { id: "cancel", label: "Patient cancels 09:15", detail: "Slot needs to reopen", tone: "neutral", lane: "shared" },
+          { id: "hard-delete", label: "Hard DELETE row", detail: "Record erased from table", tone: "trap", lane: "trap" },
+          { id: "audit-gap", label: "7-year audit fails", detail: "History gone at inspection", tone: "trap", lane: "trap" },
+          { id: "soft-status", label: "Mark status = cancelled", detail: "Keep timestamp + reopen slot", tone: "accent", lane: "sound" },
+          { id: "audit-intact", label: "Slot free & history kept", detail: "Passes clinical inspection", tone: "sound", lane: "sound" },
+        ],
+        edges: [
+          { from: "cancel", to: "hard-delete", label: "Shortcut" },
+          { from: "hard-delete", to: "audit-gap", label: "Erased" },
+          { from: "cancel", to: "soft-status", label: "Append state" },
+          { from: "soft-status", to: "audit-intact", label: "Verified" },
+        ],
+      },
     },
   ],
   followUps: {
@@ -146,6 +179,7 @@ export const harbourClinic: ProjectScenario = {
       id: "F1",
       text: "Double bookings happen when Mandy and Kit edit the shared spreadsheet at the same time, mostly between 8:30 and 9:30.",
       cues: ["happen", "wrong", "double", "same time", "same slot", "spreadsheet", "morning", "rush", "busy", "cause", "why", "reception", "mandy", "kit"],
+      question: "When do the double bookings happen in the morning rush, and why?",
       reply:
         "It's always the morning rush, about half eight to half nine. Mandy and Kit both have the spreadsheet open and both type into the same row. Neither of them notices until two patients turn up.",
     },
@@ -153,6 +187,7 @@ export const harbourClinic: ProjectScenario = {
       id: "F2",
       text: "Cancelled appointments must stay on record. The clinic keeps appointment history for seven years.",
       cues: ["cancel", "record", "history", "delete", "rule", "regulation", "audit", "keep", "data"],
+      question: "What happens to an appointment record and history when someone cancels?",
       reply:
         "Oh, cancellations must stay on file. We keep the appointment history for seven years, the auditors check it. Right now we just colour the row grey.",
     },
@@ -160,6 +195,7 @@ export const harbourClinic: ProjectScenario = {
       id: "F3",
       text: "Patients book by phone. No patient app has been approved, and the budget is about two weeks of work.",
       cues: ["patient", "app", "who will use", "user", "budget", "cost", "money", "online", "phone", "scope"],
+      question: "Who will use this tool, how do patients book by phone, and what's the budget?",
       reply:
         "Honestly, most of our patients just ring us. The board hasn't approved any patient app. Leo said you can give us about two weeks, and that's what we can pay for.",
     },
@@ -167,6 +203,7 @@ export const harbourClinic: ProjectScenario = {
       id: "F4",
       text: "Each slot is 15 minutes. Dr Chan only works Tuesday and Thursday mornings.",
       cues: ["slot", "length", "minutes", "doctor", "schedule", "hours", "shift", "long is"],
+      question: "How long is each appointment slot in minutes, and what is each doctor's schedule?",
       reply:
         "Every appointment is fifteen minutes. Dr Lee is in every day, Dr Chan only Tuesday and Thursday mornings.",
     },
@@ -174,6 +211,7 @@ export const harbourClinic: ProjectScenario = {
       id: "F5",
       text: "Reception uses one old shared PC with Chrome. Nothing can be installed on it.",
       cues: ["computer", "pc", "device", "laptop", "browser", "install", "equipment", "tablet", "hardware"],
+      question: "What computer and browser equipment does reception have at the front desk?",
       reply:
         "We've got one old PC at the front desk, the clinic's IT won't let us install anything. Chrome works, that's about it.",
     },
@@ -181,6 +219,7 @@ export const harbourClinic: ProjectScenario = {
       id: "F6",
       text: "For Grace, success means fewer than one double booking per week.",
       cues: ["success", "measure", "fixed", "goal", "good", "better", "how will you know", "target", "result"],
+      question: "How will you know it's fixed—what target would measure success?",
       reply:
         "If we got it down to less than one double booking a week, I'd be thrilled. Right now it's three or four.",
     },
@@ -467,6 +506,24 @@ export const harbourClinic: ProjectScenario = {
     },
   ],
   testFile: bookingTest,
+  viva: {
+    question:
+      "Before Mandy and Kit use this tomorrow morning: what stops two receptionists from booking the same slot at the same second, and how will we know within a week that the fix actually held?",
+    items: [
+      {
+        id: "V1",
+        label: "Explains the save-time / simultaneous booking safeguard or keeping cancelled records",
+        competency: "discernment",
+        cues: [["same time", "same moment", "simultaneous", "unique", "database", "save", "reject", "cancel", "history", "record"]],
+      },
+      {
+        id: "V2",
+        label: "Explains piloting with one doctor or counting weekly double bookings against the target",
+        competency: "diligence",
+        cues: [["pilot", "trial", "measure", "count", "week", "weekly", "double booking", "target", "dr lee"]],
+      },
+    ],
+  },
   reviewReasons: [
     { id: "double-booking", label: "Two people can still book the same slot" },
     { id: "cancel-deletes", label: "Cancelled appointments disappear from the history" },
@@ -500,6 +557,7 @@ export const harbourClinic: ProjectScenario = {
       "changes-wrong": "You sent Cody's work back for the wrong reason, and Grace asked why it was taking longer.",
       "release-measure": "You released with a weekly count against Grace's target.",
       "release-now": "You switched the whole clinic over at once, with no way to catch a problem early.",
+      "viva-strong": "Grace appreciated your clear sign-off explanation before rollout.",
     },
     outcome: {
       success: { delta: 1, reason: "The weekly count showed the problem is solved." },

@@ -1,5 +1,7 @@
 import { randomInt } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { EMPTY_QUOTA_OVERRIDES, type QuotaOverrides } from "@/lib/ai/quota";
 import type { SimulationState } from "@/lib/learning/simulation/engine";
 import { projectListings } from "@/lib/projects/catalog";
 import { getProjectScenario } from "@/lib/projects";
@@ -10,9 +12,10 @@ import { HttpError, recordDb, redactSecrets } from "@/lib/supabase/server";
 
 /*
  * An instructor's classes: students join with a code, the instructor assigns
- * built-in projects or their own, and follows each student's runs. Reads and writes go
- * through the instructor's row-level-secured client; students' runs are read
- * with the service role only after that client has shown the class is theirs.
+ * built-in projects or their own, configures per-student hourly AI quotas, and
+ * follows each student's runs. Reads and writes go through the instructor's
+ * row-level-secured client; students' runs are read with the service role only
+ * after that client has shown the class is theirs.
  */
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -38,7 +41,30 @@ export async function assignableFor(db: SupabaseClient) {
   return [...ASSIGNABLE, ...own.map(({ id, title }) => ({ id, title }))];
 }
 
-export type ClassRow = { id: string; name: string; join_code: string; created_at: string };
+export type ClassRow = {
+  id: string;
+  name: string;
+  join_code: string;
+  created_at: string;
+  quota_generation?: number | null;
+  quota_roleplay?: number | null;
+  quota_feedback?: number | null;
+};
+
+const quotaValueSchema = z.number().int().min(0).max(500).nullable();
+export const classQuotaSchema = z.object({
+  generation: quotaValueSchema,
+  roleplay: quotaValueSchema,
+  feedback: quotaValueSchema,
+});
+
+export function quotasOfClass(row: Partial<ClassRow> | null | undefined): QuotaOverrides {
+  return {
+    generation: row?.quota_generation ?? null,
+    roleplay: row?.quota_roleplay ?? null,
+    feedback: row?.quota_feedback ?? null,
+  };
+}
 
 export async function createClass(db: SupabaseClient, ownerId: string, name: string): Promise<ClassRow> {
   // A clash with another class's code is unlikely; retry a few times if it happens.
@@ -58,31 +84,90 @@ export async function createClass(db: SupabaseClient, ownerId: string, name: str
 }
 
 export async function listOwnClasses(db: SupabaseClient, ownerId: string) {
-  const { data } = await db
+  const initial = await db
     .from("classes")
-    .select("id,name,join_code,created_at,class_members(count)")
+    .select("id,name,join_code,created_at,quota_generation,quota_roleplay,quota_feedback,class_members(count)")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
-  return ((data ?? []) as (ClassRow & { class_members: { count: number }[] })[]).map((row) => ({
+
+  let rows = (initial.data ?? null) as (ClassRow & { class_members: { count: number }[] })[] | null;
+  if (initial.error?.code === "42703") {
+    const fallback = await db
+      .from("classes")
+      .select("id,name,join_code,created_at,class_members(count)")
+      .eq("owner_id", ownerId)
+      .order("created_at", { ascending: false });
+    rows = (fallback.data ?? null) as (ClassRow & { class_members: { count: number }[] })[] | null;
+  }
+
+  return (rows ?? []).map((row) => ({
     ...row,
     students: row.class_members[0]?.count ?? 0,
+    quotas: quotasOfClass(row),
   }));
 }
 
 /** The class, if the signed-in user owns it. Row-level security does the check. */
 export async function loadOwnClass(db: SupabaseClient, ownerId: string, classId: string) {
   if (!/^[0-9a-f-]{36}$/.test(classId)) return null;
-  const { data } = await db.from("classes").select("id,name,join_code,created_at").eq("id", classId).eq("owner_id", ownerId).maybeSingle();
+  let classRes = await db
+    .from("classes")
+    .select("id,name,join_code,created_at,quota_generation,quota_roleplay,quota_feedback")
+    .eq("id", classId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (classRes.error?.code === "42703") {
+    classRes = await db
+      .from("classes")
+      .select("id,name,join_code,created_at")
+      .eq("id", classId)
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+  }
+
+  const data = classRes.data as ClassRow | null;
   if (!data) return null;
+
   const [{ data: members }, { data: projects }] = await Promise.all([
     db.from("class_members").select("student_id,joined_at").eq("class_id", classId).order("joined_at"),
     db.from("class_projects").select("project_id").eq("class_id", classId).order("assigned_at"),
   ]);
   return {
-    ...(data as ClassRow),
+    ...data,
+    quotas: quotasOfClass(data),
     members: (members ?? []) as { student_id: string; joined_at: string }[],
     projects: (projects ?? []).map((row) => row.project_id as string).filter((id) => isAssignable(id) || isGeneratedId(id)),
   };
+}
+
+/** Updates student hourly AI quota limits for a class owned by `ownerId`. */
+export async function updateClassQuotas(
+  db: SupabaseClient,
+  ownerId: string,
+  classId: string,
+  quotas: QuotaOverrides,
+): Promise<QuotaOverrides> {
+  if (!/^[0-9a-f-]{36}$/.test(classId)) throw new HttpError(404, "Class not found.");
+  const { data, error } = await db
+    .from("classes")
+    .update({
+      quota_generation: quotas.generation,
+      quota_roleplay: quotas.roleplay,
+      quota_feedback: quotas.feedback,
+    })
+    .eq("id", classId)
+    .eq("owner_id", ownerId)
+    .select("id,quota_generation,quota_roleplay,quota_feedback");
+
+  if (error?.code === "42703") {
+    throw new HttpError(503, "Class quota settings require applying the latest database migration.");
+  }
+  if (error) {
+    throw new HttpError(error.code === "42501" ? 403 : 503, "Could not update class student quotas.");
+  }
+  if (!data?.length) throw new HttpError(404, "Class not found or not owned by you.");
+  return quotasOfClass(data[0] as ClassRow);
 }
 
 /** Replaces the class's assigned projects with those of `projectIds` the instructor may assign. */
@@ -164,7 +249,7 @@ export async function classProgress(
   }
   const service = recordDb();
   const ids = members.map((member) => member.student_id);
-  const [{ data: sessions, error }, users] = await Promise.all([
+  const [{ data: sessions, error }, { data: profileRows }, users] = await Promise.all([
     projectIds.length
       ? service
           .from("simulation_sessions")
@@ -172,14 +257,20 @@ export async function classProgress(
           .in("user_id", ids)
           .in("course_id", projectIds.map((id) => `project:${id}`))
       : Promise.resolve({ data: [], error: null }),
+    service.from("profiles").select("id,display_name").in("id", ids),
     Promise.all(ids.map((id) => service.auth.admin.getUserById(id).then(({ data }) => [id, data.user?.email ?? null] as const))),
   ]);
   if (error) throw new HttpError(503, "Could not load the class's progress. Please retry.");
   const emails = new Map(users);
+  const displayNames = new Map(
+    ((profileRows ?? []) as Array<{ id: string; display_name?: string | null }>).map((p) => [
+      p.id,
+      p.display_name?.trim() || null,
+    ]),
+  );
   return members.map((member) => {
     const email = emails.get(member.student_id) ?? null;
-    // Names come from the email: the retired onboarding's display names are stale, and nothing sets them now.
-    const name = email?.split("@")[0] || "Student";
+    const name = displayNames.get(member.student_id) || email?.split("@")[0] || "Student";
     const runs: Record<string, RunSummary> = {};
     for (const projectId of projectIds) {
       const scenario = scenarios.get(projectId);
@@ -208,22 +299,31 @@ export async function joinClass(db: SupabaseClient, code: string) {
   return row;
 }
 
-/** The classes the student is in, with their assigned projects. */
+/** The classes the student is in, with their assigned projects and class quota caps. */
 export async function studentClasses(db: SupabaseClient, studentId: string) {
   const { data: memberships } = await db.from("class_members").select("class_id").eq("student_id", studentId);
   const classIds = (memberships ?? []).map((row) => row.class_id as string);
   if (!classIds.length) return [];
-  const [{ data: classes }, { data: projects }] = await Promise.all([
-    db.from("classes").select("id,name").in("id", classIds),
-    db.from("class_projects").select("class_id,project_id").in("class_id", classIds),
-  ]);
+
+  const classesInitial = await db
+    .from("classes")
+    .select("id,name,quota_generation,quota_roleplay,quota_feedback")
+    .in("id", classIds);
+  let classRows = (classesInitial.data ?? null) as Partial<ClassRow>[] | null;
+  if (classesInitial.error?.code === "42703") {
+    const fallback = await db.from("classes").select("id,name").in("id", classIds);
+    classRows = (fallback.data ?? null) as Partial<ClassRow>[] | null;
+  }
+  const { data: projects } = await db.from("class_projects").select("class_id,project_id").in("class_id", classIds);
+
   // Titles of the instructors' own projects; the student can't read those rows themselves.
   const generated = [...new Set((projects ?? []).map((item) => item.project_id as string).filter(isGeneratedId))];
   const { data: titles } = generated.length ? await recordDb().from("generated_projects").select("id,title").in("id", generated) : { data: [] };
   const known = [...ASSIGNABLE, ...((titles ?? []) as { id: string; title: string }[])];
-  return (classes ?? []).map((row) => ({
+  return (classRows ?? []).map((row) => ({
     id: row.id as string,
     name: row.name as string,
+    quotas: row ? quotasOfClass(row) : { ...EMPTY_QUOTA_OVERRIDES },
     projects: (projects ?? [])
       .filter((item) => item.class_id === row.id)
       .map((item) => known.find((project) => project.id === item.project_id))

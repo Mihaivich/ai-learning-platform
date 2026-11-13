@@ -7,11 +7,22 @@ import { checkProject } from "../src/lib/projects/generated/validate";
 import { askClient, chooseAction, endInterview, projectView, requestChanges, sendBack, startProject, submitBrief, submitRequirements, type ProjectStep } from "../src/lib/projects/runtime";
 import { getProjectScenario } from "../src/lib/projects";
 import { projectListings } from "../src/lib/projects/catalog";
+import { beanAndBreadDraft } from "../src/lib/projects/bean-and-bread";
 import { parcelPalDraft } from "../src/lib/projects/parcelpal";
+import { riverNitrateLabDraft } from "../src/lib/projects/river-nitrate-lab";
+import { sunsetDaycareDraft } from "../src/lib/projects/sunset-daycare";
 import { tidewaterSwimDraft } from "../src/lib/projects/tidewater-swim";
+import { wardGelAuditDraft } from "../src/lib/projects/ward-gel-audit";
 
 // Built-in projects written as drafts: they must pass the same checks as generated ones.
-const drafts = { "tidewater-swim": tidewaterSwimDraft, parcelpal: parcelPalDraft };
+const drafts = {
+  "ward-gel-audit": wardGelAuditDraft,
+  "sunset-daycare": sunsetDaycareDraft,
+  "bean-and-bread": beanAndBreadDraft,
+  "river-nitrate-lab": riverNitrateLabDraft,
+  "tidewater-swim": tidewaterSwimDraft,
+  parcelpal: parcelPalDraft,
+};
 
 for (const [id, draft] of Object.entries(drafts)) {
   test(`${id} passes every check and teaches its two concepts`, async () => {

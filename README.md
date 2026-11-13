@@ -1,14 +1,21 @@
 # DevPath
 
-**Lead a software project with AI on your team.**
+**Master any subject by leading AI on real-world work.**
 
-DevPath is a learning platform built around immersive project simulations. The learner sits at a simulated macOS-style desktop and leads a small software project from first email to release: they interview a client, write requirements, brief an AI coding agent, review what it builds and decide how to ship. Every choice changes how the project ends.
+DevPath is a universal, cross-disciplinary GenAI mini-course and simulation platform built for **Anthropic's 4D AI Fluency** (*Delegation, Description, Discernment, Diligence*). Every built-in, instructor-created, and learner-generated course combines **three interactive formats** out of the box—with zero per-profession custom coding:
 
-Each job rests on two concepts of its subject, and the AI coding agent gets them wrong the way beginners do. The learner learns them by catching the mistake and explaining why it's wrong. The report at the end scores how they worked with AI on the four AI Fluency competencies, then explains each idea and what happened to it in their run.
+1. **Act 01 · Interactive Visual Primer (`/projects/[id]/learn`)**: Click-to-compare SVG/CSS concept simulators (`Naive Trap` vs `Calibrated Fix`) and everyday analogies vs classic misconceptions.
+2. **Act 02 · 60-Second Spot-the-Trap Mini-Game**: Tactile rapid-judgment cards with streak scoring, keyboard shortcuts, and instant conceptual feedback.
+3. **Act 03 · Click-First Simulated Workday + Live Stakeholder Viva (`/projects/[id]`)**: Zero-typing-capable interactive cards across the entire workday—ask stakeholder discovery questions with one click, assemble measurable specifications and AI briefs from paired guardrail vs trap cards, audit **polymorphic deliverables** (**Spreadsheet Tables**, **Redline Document Clauses**, **Lab/Field SOP Steps**, or **Code Diffs**), and defend your reasoning in a **Live Sign-Off Viva** before launch.
 
-- **For learners:** three built-in software engineering projects, each playable as product lead (no code) or tech lead (the pull request). They can also have a project written for their own background, subject and level, or follow a learning path of three.
-- **For administrators:** every account with its role, making accounts instructors, and an overview of how the platform is used.
-- **For instructors:** classes joined with a code, assigned projects, and each student's progress, concepts and teach-back notes. They can also create projects from their own teaching material, customise existing ones with AI and edit the words by hand.
+- **7 Built-In Courses Across 5 Disciplines:**
+  - *Data & Healthcare:* **Ward 4B hand-gel audit** (Clinical Statistics — incidence rates vs raw counts & confounding variables; `table` audit)
+  - *Business & Economics:* **Sunset Daycare pickup policy** (Behavioural Economics — crowding out intrinsic motivation & selection bias; `table` audit)
+  - *Law & Media:* **Bean & Bread loyalty pass** (Service Operations & Privacy Law — cycle time & explicit opt-in consent; `document` clause redline)
+  - *Natural Sciences:* **River Meadow nitrate SOP** (Analytical Chemistry — matrix blanks & cold-chain holding time; `steps` protocol audit)
+  - *Software & AI:* **Harbour Clinic**, **Tidewater Swim School**, and **ParcelPal** (`code` PR diff audit)
+- **For learners:** Filter courses by discipline, generate a verified mini-course or 3-step learning path for *any* major, **share courses to the public Community Gallery**, or **One-Click Remix** any built-in or peer course into your own field.
+- **For instructors & administrators:** Create classes with 6-character join codes, generate or customise courses from syllabus notes, hand-edit scenarios with automated fairness checks, track student progress/concepts/teach-back, and manage roles on `/admin`.
 
 **Live:** https://ai-learning-platform-sable.vercel.app. The home page has a 30-second product tour.
 

@@ -75,9 +75,14 @@ export default async function PathPage({ params }: { params: Promise<{ pathId: s
               </ul>
               {state.outcome && <p className="mt-4 text-sm text-white/65">{OUTCOMES[state.outcome] ?? ""}</p>}
               {state.projectId ? (
-                <Link href={`/projects/${state.projectId}`} className="mt-6 inline-flex rounded-full bg-white px-6 py-2.5 text-[15px] font-medium text-black hover:bg-white/85">
-                  {state.status === "done" ? "Open it again" : "Open the desktop"}
-                </Link>
+                <div className="mt-6 flex flex-wrap gap-2.5">
+                  <Link href={`/projects/${state.projectId}/learn`} className="inline-flex rounded-full bg-white px-6 py-2.5 text-[15px] font-medium text-black hover:bg-white/85">
+                    {state.status === "done" ? "Replay mini-course" : "Start mini-course"}
+                  </Link>
+                  <Link href={`/projects/${state.projectId}`} className="inline-flex rounded-full border border-white/20 px-5 py-2.5 text-[15px] font-medium text-white/85 hover:border-white/50 hover:bg-white/10">
+                    Open desktop
+                  </Link>
+                </div>
               ) : state.status === "ready" ? (
                 <CreatePathStep pathId={pathId} step={index + 1} />
               ) : null}

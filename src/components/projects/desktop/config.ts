@@ -10,6 +10,7 @@ export type Op =
   | { op: "end-interview" }
   | { op: "requirements"; text: string }
   | { op: "brief"; text: string }
+  | { op: "viva"; text: string }
   | { op: "request-changes"; reasonId?: string; path?: string; line?: number; explanation?: string };
 
 export type Send = (op: Op) => Promise<boolean>;
@@ -114,12 +115,16 @@ export function nextStep(view: ProjectView): string | null {
     case "interview":
       return `Open Meet and take ${client}'s call`;
     case "requirements":
-      return "Open Notes and write the requirements";
+      return "Open Notes and build the requirements";
     case "brief":
     case "brief-test":
-      return `Open ${agent} and write its task`;
+      return `Open ${agent} and assemble its brief`;
     case "review":
-      return view.track === "engineering" ? `Open Review and check ${agent}'s pull request` : `Open Review and watch ${agent}'s walkthrough`;
+      return view.track === "engineering"
+        ? view.scenario.artifactKind && view.scenario.artifactKind !== "code"
+          ? `Open Review and inspect ${agent}'s deliverable`
+          : `Open Review and check ${agent}'s pull request`
+        : `Open Review and watch ${agent}'s walkthrough`;
     case "release":
       return "Open Launch and decide how to release";
     default:
@@ -146,24 +151,26 @@ export function guideFor(view: ProjectView): string[] {
       ];
     case "interview":
       return [
-        `${client} is on the call in Meet. Ask open questions about what goes wrong today.`,
+        `${client} is on the call in Meet. Click questions to uncover what really goes wrong.`,
         "Facts you uncover land in the column on the right of the call.",
         `Ask at least ${view.interview.min} questions. End the call when you know enough; ${client} has time for ${view.interview.max}.`,
       ];
     case "requirements":
       return [
-        "Write the requirements note in Notes, in your own words.",
-        `Say what ${deliverable} must do, what it must never do, and how you'll know it worked.`,
-        "Only what you found out on the call is in your notes. Gaps here become gaps later.",
+        "Build the requirements specification in Notes by choosing one clause per section.",
+        `Decide what ${deliverable} must do, what it must never do, and how you'll know it worked.`,
+        "Watch out for surface shortcuts—gaps here become gaps later.",
       ];
     case "brief":
     case "brief-test":
       return [
-        `Open ${agent} and write its task.`,
-        `${agent} does exactly what you ask and fills every gap with its own assumptions.`,
+        `Open ${agent} and select the directives for its brief.`,
+        `${agent} does exactly what you select and acts on any misconception you leave in.`,
         product
-          ? "Say what to make, what must never happen, and what's out of scope."
-          : "Name the constraints, what's out of scope, and how you'll check the result (a test).",
+          ? "Pick the core handling, non-negotiable guardrail, and strict scope boundary."
+          : view.scenario.artifactKind && view.scenario.artifactKind !== "code"
+            ? "Select the domain rules, what must never happen, and what's out of scope."
+            : "Select the constraints, what's out of scope, and the verification check (a test).",
       ];
     case "review":
       return product
@@ -173,11 +180,18 @@ export function guideFor(view: ProjectView): string[] {
             "If something would hurt the client, send it back with the reason. A wrong reason costs a day.",
             "Approve when you're satisfied.",
           ]
-        : [
-            `Read ${agent}'s pull request in Review: the diff and the checks.`,
-            "If a line is wrong, click it and request changes. A wrong line costs a day.",
-            "Approve and merge when you're satisfied.",
-          ];
+        : view.scenario.artifactKind && view.scenario.artifactKind !== "code"
+          ? [
+              `Inspect ${agent}'s deliverable in Review entry by entry.`,
+              ...(view.conceptCount ? ["When you flag an entry, explain what goes wrong and why it happens."] : []),
+              "Click the flawed entry and send it back. Flagging a sound entry costs a day.",
+              "Approve when you're satisfied.",
+            ]
+          : [
+              `Read ${agent}'s pull request in Review: the diff and the checks.`,
+              "If a line is wrong, click it and request changes. A wrong line costs a day.",
+              "Approve and merge when you're satisfied.",
+            ];
     case "release":
       return [
         `Open Launch and choose how ${deliverable} reaches ${client}'s people.`,

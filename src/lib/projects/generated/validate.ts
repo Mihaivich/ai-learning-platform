@@ -92,6 +92,22 @@ export async function checkProject(
       if (normalise(concept.inTheJob).includes(` ${normalise(draft.assistant.name).trim()} `)) {
         problems.push(`"In this job" for "${concept.name}" mentions ${draft.assistant.name}. It must only say what to look for.`);
       }
+      if (concept.diagram) {
+        const ids = new Set<string>();
+        for (const node of concept.diagram.nodes) {
+          if (ids.has(node.id)) {
+            problems.push(`Concept "${concept.name}" diagram has duplicate node id "${node.id}".`);
+          }
+          ids.add(node.id);
+        }
+        for (const edge of concept.diagram.edges) {
+          if (!ids.has(edge.from) || !ids.has(edge.to)) {
+            problems.push(`Concept "${concept.name}" diagram edge "${edge.from} -> ${edge.to}" references an unknown node id.`);
+          } else if (edge.from === edge.to) {
+            problems.push(`Concept "${concept.name}" diagram edge "${edge.from} -> ${edge.to}" loops to itself.`);
+          }
+        }
+      }
     }
   }
 
@@ -123,6 +139,44 @@ export async function checkProject(
     const steps = normalise(`${summary} ${demo.map((step) => `${step.action} ${step.result}`).join(" ")}`);
     const tells = TELLS.filter((tell) => steps.includes(` ${tell}`));
     if (tells.length) problems.push(`The ${key} walkthrough explains its own flaw (${tells.join(", ")}). Show the confident result and let the learner work out why.`);
+  }
+
+  // Optional structured specialist artifact (table, document or protocol steps).
+  if (draft.artifact) {
+    const artifact = draft.artifact;
+    if (artifact.kind === "table") {
+      if (!artifact.columns || artifact.columns.length < 2) {
+        problems.push("A table artifact must provide at least 2 column headers in artifact.columns.");
+      } else {
+        const expectedCols = artifact.columns.length;
+        const allSets = [
+          ["good", artifact.good],
+          ["missesProblem", artifact.missesProblem.lines],
+          ["missesRule", artifact.missesRule.lines],
+          ["scopeCreep", artifact.scopeCreep.lines],
+        ] as const;
+        for (const [label, rows] of allSets) {
+          rows.forEach((row, idx) => {
+            const cells = row.split("|").map((cell) => cell.trim());
+            if (cells.length !== expectedCols || cells.some((cell) => !cell)) {
+              problems.push(`Artifact ${label} row ${idx + 1} has ${cells.length} cells, expected ${expectedCols} non-empty "|" cells matching columns.`);
+            }
+          });
+        }
+      }
+    }
+    for (const key of ["missesProblem", "missesRule", "scopeCreep"] as const) {
+      const entry = artifact[key];
+      if (entry.flawedLine < 1 || entry.flawedLine > entry.lines.length) {
+        problems.push(`Artifact ${key}.flawedLine (${entry.flawedLine}) is outside 1..${entry.lines.length}.`);
+      } else {
+        const text = normalise(entry.lines[entry.flawedLine - 1]);
+        const tells = TELLS.filter((tell) => text.includes(` ${tell}`));
+        if (tells.length) {
+          problems.push(`Artifact ${key} flawed entry explains its own flaw (${tells.join(", ")}). Show the flawed entry itself, not why it is wrong.`);
+        }
+      }
+    }
   }
 
   problems.push(...simulationProblems(scenario.config, { allowSystemActions: true }));
@@ -199,6 +253,30 @@ export async function checkProject(
       if (fixed.variables.variant !== "good") problems.push(`Sending the ${action} version back for "${reason}" did not fix it.`);
       const wrong = requestChanges(scenario, review, { reasonId: "distractor" }).state;
       if (memoOf(wrong).reviews.at(-1)?.correct !== false) problems.push(`The distractor reason fixed the ${action} version.`);
+    }
+
+    // When a draft has a structured artifact, play the specialist review track too.
+    if (draft.artifact) {
+      let specState = startProject(scenario);
+      specState = chooseAction(scenario, specState, "pick-engineering").state;
+      specState = chooseAction(scenario, specState, "call-grace").state;
+      for (const fact of scenario.facts) {
+        specState = (await askClient(scenario, specState, draft.facts[ROLE_OF_FACT[fact.id]].sampleQuestion, offlineEvaluator)).state;
+      }
+      specState = endInterview(scenario, specState).state;
+      specState = (await submitRequirements(scenario, specState, draft.samples.requirements, offlineEvaluator)).state;
+      for (const [action, key] of [
+        ["brief-problem", "missesProblem"],
+        ["brief-rule", "missesRule"],
+        ["brief-scope", "scopeCreep"],
+      ] as const) {
+        const specReview = system(scenario, system(scenario, specState, action), "without-test");
+        const target = draft.artifact[key].flawedLine;
+        const fixed = requestChanges(scenario, specReview, { path: draft.artifact.fileName, line: target }).state;
+        if (fixed.variables.variant !== "good") {
+          problems.push(`Flagging line ${target} in ${key} on the specialist track did not fix it.`);
+        }
+      }
     }
   } catch (error) {
     problems.push(`The project could not be played through: ${error instanceof Error ? error.message : String(error)}`);
