@@ -46,6 +46,27 @@ const deliverable = z.object({
 
 const choice = z.object({ label: text(120), feedback: text(300) });
 
+export const diagramNodeSchema = z.object({
+  id: z.string().trim().min(1).max(24).describe('Short unique node id, such as "input", "trap", or "fix".'),
+  label: text(48).describe("Concise node title (2 to 5 words)."),
+  detail: text(96).optional().describe("Optional short subtitle or concrete figure."),
+  tone: z.enum(["neutral", "trap", "sound", "accent"]).describe("neutral for shared context, trap for the misconception path, sound for the calibrated path, accent for the key check."),
+  lane: z.enum(["shared", "trap", "sound"]).optional().describe("Which lens shows this node: shared (both), trap (naive path), or sound (calibrated path)."),
+});
+
+export const diagramEdgeSchema = z.object({
+  from: z.string().trim().min(1).max(24).describe("Source node id from nodes."),
+  to: z.string().trim().min(1).max(24).describe("Target node id from nodes."),
+  label: text(36).optional().describe("Optional short arrow verb or condition."),
+  style: z.enum(["solid", "dashed"]).optional(),
+});
+
+export const structuredDiagramSchema = z.object({
+  caption: text(120).describe("One-line caption stating what this concept diagram compares or traces."),
+  nodes: z.array(diagramNodeSchema).min(3).max(6),
+  edges: z.array(diagramEdgeSchema).min(2).max(6),
+});
+
 /**
  * A subject concept the job depends on. The assistant's flawed version acts on
  * the misconception, so the learner understands the concept by catching it.
@@ -57,6 +78,9 @@ const concept = z.object({
   misconception: text(240).describe("The common wrong belief, stated as the belief, such as \"If two things change together, one caused the other.\""),
   inTheJob: text(300).describe("How the concept shows up in this job, without giving away which delivered version is wrong."),
   cues: z.array(cue).min(2).max(8).describe("Words for the concept that also appear in its fact and its flawed walkthrough."),
+  diagram: structuredDiagramSchema
+    .optional()
+    .describe("Optional structured SVG flow diagram contrasting the naive misconception path (lane: trap) against the calibrated approach (lane: sound)."),
 });
 
 const factRoles = {

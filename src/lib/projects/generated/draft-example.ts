@@ -236,6 +236,22 @@ export const harbourClinicDraft: ProjectDraft = {
       misconception: "Checking that a slot is free before saving is enough to stop two people booking it.",
       inTheJob: "Mandy and Kit book in the morning rush, often within seconds of each other. A safeguard only counts if it holds when they save at the same moment, not just one after the other.",
       cues: ["same time", "same moment", "both"],
+      diagram: {
+        caption: "Two receptionists click Save on 09:00 Dr Lee in the same second",
+        nodes: [
+          { id: "rush", label: "Simultaneous click", detail: "Mandy & Kit both book 09:00", tone: "neutral", lane: "shared" },
+          { id: "check-first", label: "Check then insert", detail: "Both read slot = free", tone: "trap", lane: "trap" },
+          { id: "double-booked", label: "Double booking ships", detail: "Two patients arrive at 09:00", tone: "trap", lane: "trap" },
+          { id: "unique-idx", label: "Atomic DB unique index", detail: "Single-step constraint on slot", tone: "accent", lane: "sound" },
+          { id: "safe-slot", label: "One wins, one notified", detail: "Second save cleanly refused", tone: "sound", lane: "sound" },
+        ],
+        edges: [
+          { from: "rush", to: "check-first", label: "Naive gap" },
+          { from: "check-first", to: "double-booked", label: "Both write" },
+          { from: "rush", to: "unique-idx", label: "Atomic rule" },
+          { from: "unique-idx", to: "safe-slot", label: "Enforced" },
+        ],
+      },
     },
     rule: {
       name: "Audit trails",
@@ -244,6 +260,22 @@ export const harbourClinicDraft: ProjectDraft = {
       misconception: "Once something is cancelled it is no longer needed, so the cleanest thing is to delete it.",
       inTheJob: "The clinic is checked by auditors and has to keep its appointment history. Watch what happens to an appointment when it is cancelled.",
       cues: ["cancel", "record", "history", "delete"],
+      diagram: {
+        caption: "What happens in storage when a booked slot is cancelled",
+        nodes: [
+          { id: "cancel", label: "Patient cancels 09:15", detail: "Slot needs to reopen", tone: "neutral", lane: "shared" },
+          { id: "hard-delete", label: "Hard DELETE row", detail: "Record erased from table", tone: "trap", lane: "trap" },
+          { id: "audit-gap", label: "7-year audit fails", detail: "History gone at inspection", tone: "trap", lane: "trap" },
+          { id: "soft-status", label: "Mark status = cancelled", detail: "Keep timestamp + reopen slot", tone: "accent", lane: "sound" },
+          { id: "audit-intact", label: "Slot free & history kept", detail: "Passes clinical inspection", tone: "sound", lane: "sound" },
+        ],
+        edges: [
+          { from: "cancel", to: "hard-delete", label: "Shortcut" },
+          { from: "hard-delete", to: "audit-gap", label: "Erased" },
+          { from: "cancel", to: "soft-status", label: "Append state" },
+          { from: "soft-status", to: "audit-intact", label: "Verified" },
+        ],
+      },
     },
   },
   samples: {

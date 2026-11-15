@@ -92,6 +92,22 @@ export async function checkProject(
       if (normalise(concept.inTheJob).includes(` ${normalise(draft.assistant.name).trim()} `)) {
         problems.push(`"In this job" for "${concept.name}" mentions ${draft.assistant.name}. It must only say what to look for.`);
       }
+      if (concept.diagram) {
+        const ids = new Set<string>();
+        for (const node of concept.diagram.nodes) {
+          if (ids.has(node.id)) {
+            problems.push(`Concept "${concept.name}" diagram has duplicate node id "${node.id}".`);
+          }
+          ids.add(node.id);
+        }
+        for (const edge of concept.diagram.edges) {
+          if (!ids.has(edge.from) || !ids.has(edge.to)) {
+            problems.push(`Concept "${concept.name}" diagram edge "${edge.from} -> ${edge.to}" references an unknown node id.`);
+          } else if (edge.from === edge.to) {
+            problems.push(`Concept "${concept.name}" diagram edge "${edge.from} -> ${edge.to}" loops to itself.`);
+          }
+        }
+      }
     }
   }
 

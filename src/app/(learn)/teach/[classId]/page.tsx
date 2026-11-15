@@ -3,8 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { glass } from "@/components/home/glass";
 import { Reveal } from "@/components/home/Reveal";
+import { ClassStudentQuotaChart, HourlyUsageChart } from "@/components/quota/QuotaCharts";
 import { AssignProjects } from "@/components/teach/AssignProjects";
+import { ClassQuotaSettings } from "@/components/teach/ClassQuotaSettings";
 import { RemoveStudent } from "@/components/teach/RemoveStudent";
+import { loadClassStudentQuotaUsage } from "@/lib/ai/quota";
 import { assignableFor, classProgress, loadOwnClass, type RunSummary } from "@/lib/classes";
 import type { ConceptResult } from "@/lib/projects/runtime";
 import { instructor } from "@/lib/instructor";
@@ -79,7 +82,13 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   if (!teacher) notFound();
   const owned = await loadOwnClass(teacher.db, teacher.user.id, classId);
   if (!owned) notFound();
-  const [students, assignable] = await Promise.all([classProgress(teacher.user.id, owned.members, owned.projects), assignableFor(teacher.db)]);
+  const [students, assignable] = await Promise.all([
+    classProgress(teacher.user.id, owned.members, owned.projects),
+    assignableFor(teacher.db),
+  ]);
+  const classUsage = await loadClassStudentQuotaUsage(
+    students.map((s) => ({ id: s.id, name: s.name, email: s.email })),
+  );
   const titles = new Map(assignable.map((project) => [project.id, project.title]));
 
   return (
@@ -101,6 +110,21 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
         <div className="mt-4">
           <AssignProjects classId={owned.id} projects={assignable} assigned={owned.projects} />
         </div>
+      </section>
+
+      <section className="mt-12 space-y-5">
+        <div>
+          <h2 className="text-xl font-semibold">Class AI Quota &amp; Usage Analytics</h2>
+          <p className="mt-1 text-sm text-white/55">
+            Set tighter downward hourly caps for students in this class and monitor live class AI usage.
+          </p>
+        </div>
+        <ClassQuotaSettings classId={owned.id} initial={owned.quotas} />
+        <HourlyUsageChart
+          hourly={classUsage.hourly}
+          title="Class-wide student AI requests (last 24h)"
+        />
+        <ClassStudentQuotaChart students={classUsage.students} classQuotas={owned.quotas} />
       </section>
 
       <section className="mt-12">

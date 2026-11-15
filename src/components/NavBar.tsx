@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import type { UserQuotaSummary } from "@/lib/ai/quota-shared";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-store";
 
@@ -33,24 +34,68 @@ export function NavBar() {
   }, []);
 
   // Instructors get a link to their classes, administrators one to the admin page.
-  const [role, setRole] = useState<string | null>(null);
+  const [roleState, setRoleState] = useState<{ userId: string; role: string | null } | null>(null);
+  const roleCacheRef = useRef<{ userId: string; role: string | null } | null>(null);
+  const userId = user?.id ?? null;
+  const role = user && roleState?.userId === user.id ? roleState.role : null;
   const teacher = role === "instructor" || role === "admin";
+
+  const [quotaState, setQuotaState] = useState<{
+    userId: string;
+    gen: { remaining: number; limit: number };
+  } | null>(null);
+  const quotaFetchedRef = useRef<{ userId: string; at: number } | null>(null);
+  const genQuota = user && quotaState?.userId === user.id ? quotaState.gen : null;
+
   useEffect(() => {
     const supabase = getSupabase();
-    if (!user || !supabase) return;
+    if (!userId || !supabase) {
+      roleCacheRef.current = null;
+      quotaFetchedRef.current = null;
+      return;
+    }
+    if (roleCacheRef.current?.userId === userId) {
+      return;
+    }
     let cancelled = false;
     supabase
       .from("profiles")
       .select("role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelled) setRole(data?.role ?? null);
+        if (cancelled) return;
+        const nextRole = data?.role ?? null;
+        roleCacheRef.current = { userId, role: nextRole };
+        setRoleState({ userId, role: nextRole });
       });
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId]);
+
+  async function loadQuotaIfNeeded() {
+    if (!userId) return;
+    const now = Date.now();
+    if (quotaFetchedRef.current?.userId === userId && now - quotaFetchedRef.current.at < 60_000) {
+      return;
+    }
+    quotaFetchedRef.current = { userId, at: now };
+    try {
+      const res = await fetch("/api/quota", { cache: "no-store" });
+      if (!res.ok) {
+        quotaFetchedRef.current = null;
+        return;
+      }
+      const body = (await res.json()) as UserQuotaSummary;
+      const gen = body.buckets?.find((bucket) => bucket.bucket === "generation");
+      if (gen) {
+        setQuotaState({ userId, gen: { remaining: gen.remaining, limit: gen.limit } });
+      }
+    } catch {
+      quotaFetchedRef.current = null;
+    }
+  }
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 lg:top-8 lg:px-4">
@@ -74,7 +119,13 @@ export function NavBar() {
             </Link>
           )}
           {user ? (
-            <details ref={menu} className="relative">
+            <details
+              ref={menu}
+              className="relative"
+              onToggle={(event) => {
+                if (event.currentTarget.open) void loadQuotaIfNeeded();
+              }}
+            >
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full px-1 py-0.5 hover:bg-white/10 [&::-webkit-details-marker]:hidden">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm font-semibold text-white">
                   {initial}
@@ -83,8 +134,26 @@ export function NavBar() {
                   ▾
                 </span>
               </summary>
-              <div className="absolute right-0 z-30 mt-3 w-60 rounded-2xl border border-white/15 bg-zinc-900/90 p-2 shadow-2xl backdrop-blur-xl">
+              <div className="absolute right-0 z-30 mt-3 w-64 rounded-2xl border border-white/15 bg-zinc-900/90 p-2 shadow-2xl backdrop-blur-xl">
                 <p className="truncate px-3 py-2 text-xs text-white/45">{user.email}</p>
+                <Link
+                  href="/profile#quota"
+                  onClick={() => {
+                    if (menu.current) menu.current.open = false;
+                  }}
+                  className="mb-1 block rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-cyan-200 hover:bg-white/10"
+                >
+                  {genQuota ? `AI Quota · ${genQuota.remaining}/${genQuota.limit} gen left` : "AI Quota · View usage"}
+                </Link>
+                <Link
+                  href="/profile"
+                  onClick={() => {
+                    if (menu.current) menu.current.open = false;
+                  }}
+                  className={menuLink}
+                >
+                  Profile &amp; Quota
+                </Link>
                 <button type="button" onClick={() => void signOut()} className={`${menuLink} w-full text-left`}>
                   Sign out
                 </button>

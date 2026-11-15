@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { FeedbackTrigger } from "@/components/feedback/FeedbackButton";
 import type { ProjectView } from "@/lib/projects/runtime";
 import { AppIcon, Avatar } from "./icons";
 import { CAST_TONE, guideFor, initials, stepIndex, stepsFor, type AppId, type Send } from "./config";
@@ -163,10 +165,36 @@ export function Report({ view, busy, onClose, onRestart, exit }: { view: Project
             </div>
           </div>
         )}
-        <div className="flex flex-wrap justify-end gap-2 border-t border-black/10 px-6 py-4">
-          <a href={exit.href} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">{exit.label}</a>
-          <button type="button" onClick={onClose} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">Look around</button>
-          <button type="button" disabled={busy} onClick={onRestart} className="rounded-md bg-blue-600 px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">Play again</button>
+        <div className="mx-6 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold uppercase tracking-wide text-indigo-700">Post-run review</p>
+            <p className="mt-0.5 text-[13px] text-stone-700">
+              Explore interactive concept diagrams and practice questions for every stage of this job.
+            </p>
+          </div>
+          <Link
+            href={`/projects/${view.scenario.id}/learn`}
+            className="shrink-0 rounded-md bg-indigo-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-indigo-500"
+          >
+            Learn more: concept diagrams &amp; practice →
+          </Link>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/10 px-6 py-4">
+          <FeedbackTrigger
+            projectId={view.scenario.id}
+            surface="report"
+            targetId="debrief-report"
+            targetLabel={`Debrief · ${view.scenario.title}`}
+            defaultKind="grading_issue"
+            label="Report issue"
+            tone="light"
+            context={{ outcome: completion.outcome, trust: view.meters.trust }}
+          />
+          <div className="flex flex-wrap justify-end gap-2">
+            <a href={exit.href} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">{exit.label}</a>
+            <button type="button" onClick={onClose} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">Look around</button>
+            <button type="button" disabled={busy} onClick={onRestart} className="rounded-md bg-blue-600 px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">Play again</button>
+          </div>
         </div>
       </div>
     </div>

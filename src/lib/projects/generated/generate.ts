@@ -112,6 +112,7 @@ Concept missions. When a subject is given, the job teaches it:
 - A flawed version (its summary and its walkthrough) never explains its own flaw: no "because…", no "fails to…",
   no "ignoring…", no colleague pointing it out.
   It shows the confident result and its consequence, and the learner works out why.
+- Include diagram on each concept (concepts.problem.diagram and concepts.rule.diagram): 4 or 5 nodes and 4 edges with unique short node ids, contrasting a shared starting situation (lane "shared", tone "neutral") branching into the naive misconception path (lane "trap", tone "trap") versus the calibrated method (lane "sound", tone "accent" then "sound"). Every edge.from and edge.to must match a node.id in that diagram.
 Without a subject, concepts are optional: name the real concepts behind the problem and the rule if there are clear ones.
 
 Counts: exactly 3 vagueReplies; exactly 3 demo steps per deliverable; 4 to 12 cues per fact;

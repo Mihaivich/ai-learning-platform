@@ -85,6 +85,31 @@ export type CastMember = {
   note: string;
 };
 
+export type DiagramNodeTone = "neutral" | "trap" | "sound" | "accent";
+export type DiagramLane = "shared" | "trap" | "sound";
+
+export type DiagramNode = {
+  id: string;
+  label: string;
+  detail?: string;
+  tone: DiagramNodeTone;
+  /** Comparison lens lane: shared (shown in all views), trap (naive misconception), or sound (calibrated fix). */
+  lane?: DiagramLane;
+};
+
+export type DiagramEdge = {
+  from: string;
+  to: string;
+  label?: string;
+  style?: "solid" | "dashed";
+};
+
+export type StructuredDiagram = {
+  caption: string;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+};
+
 /**
  * A concept the job depends on, explained in the report. It counts as found when the learner
  * uncovers its fact on the call.
@@ -104,6 +129,8 @@ export type ProjectConcept = {
   variant: string;
   /** Words that show the learner's explanation is about this concept. Used offline. */
   cues: string[];
+  /** Optional structured node-edge diagram rendered as SVG in post-report concept study. */
+  diagram?: StructuredDiagram;
 };
 
 /** A short email that follows from the learner's first move. */

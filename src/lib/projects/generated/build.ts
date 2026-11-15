@@ -121,9 +121,20 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     words: { deliverable: draft.deliverable ?? "the work", manager: draft.manager.name },
     concepts: draft.concepts
       ? (["problem", "rule"] as const).map((role) => {
-          const { name, explanation, bridge, misconception, inTheJob, cues } = draft.concepts![role];
+          const { name, explanation, bridge, misconception, inTheJob, cues, diagram } = draft.concepts![role];
           const variant = role === "problem" ? VARIANTS.missesProblem : VARIANTS.missesRule;
-          return { id: `K-${role}`, fact: FACT_IDS[role], name, explanation, bridge, misconception, inTheJob, variant, cues };
+          return {
+            id: `K-${role}`,
+            fact: FACT_IDS[role],
+            name,
+            explanation,
+            bridge,
+            misconception,
+            inTheJob,
+            variant,
+            cues,
+            ...(diagram ? { diagram } : {}),
+          };
         })
       : undefined,
     reportNotes: engineering ? { ...draft.reportNotes, testAsked: engineering.test.asked } : draft.reportNotes,
