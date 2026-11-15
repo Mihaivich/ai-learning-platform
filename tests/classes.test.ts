@@ -17,7 +17,15 @@ test("join codes are six unambiguous characters and match the table's check", ()
 });
 
 test("every built-in project can be assigned", () => {
-  assert.deepEqual(ASSIGNABLE.map((project) => project.id), ["harbour-clinic", "tidewater-swim", "parcelpal", "ward-infection-audit"]);
+  assert.deepEqual(ASSIGNABLE.map((project) => project.id), [
+    "harbour-clinic",
+    "tidewater-swim",
+    "parcelpal",
+    "ward-infection-audit",
+    "sunset-daycare",
+    "bean-and-bread",
+    "river-nitrate-lab",
+  ]);
 });
 
 test("a run shows the instructor where the student is, and which ideas they settled", async () => {

@@ -10,10 +10,20 @@ import { projectListings } from "../src/lib/projects/catalog";
 import { parcelPalDraft } from "../src/lib/projects/parcelpal";
 import { tidewaterSwimDraft } from "../src/lib/projects/tidewater-swim";
 import { wardInfectionAuditDraft } from "../src/lib/projects/ward-infection-audit";
+import { sunsetDaycareDraft } from "../src/lib/projects/sunset-daycare";
+import { beanAndBreadDraft } from "../src/lib/projects/bean-and-bread";
+import { riverNitrateLabDraft } from "../src/lib/projects/river-nitrate-lab";
 
 // Built-in projects written as drafts: they must pass the same checks as generated ones.
-// The software projects have both roles; the others, the product lead only.
-const drafts = { "tidewater-swim": tidewaterSwimDraft, parcelpal: parcelPalDraft, "ward-infection-audit": wardInfectionAuditDraft };
+// Projects with an artifact (code or structured deliverable) offer both roles; others, product lead only.
+const drafts = {
+  "tidewater-swim": tidewaterSwimDraft,
+  parcelpal: parcelPalDraft,
+  "ward-infection-audit": wardInfectionAuditDraft,
+  "sunset-daycare": sunsetDaycareDraft,
+  "bean-and-bread": beanAndBreadDraft,
+  "river-nitrate-lab": riverNitrateLabDraft,
+};
 const productOnly = new Set(["ward-infection-audit"]);
 
 for (const [id, draft] of Object.entries(drafts)) {

@@ -10,6 +10,7 @@ export type Op =
   | { op: "end-interview" }
   | { op: "requirements"; text: string }
   | { op: "brief"; text: string }
+  | { op: "viva"; text: string }
   | { op: "request-changes"; reasonId?: string; path?: string; line?: number; explanation?: string };
 
 export type Send = (op: Op) => Promise<boolean>;
@@ -119,7 +120,11 @@ export function nextStep(view: ProjectView): string | null {
     case "brief-test":
       return `Open ${agent} and write its task`;
     case "review":
-      return view.track === "engineering" ? `Open Review and check ${agent}'s pull request` : `Open Review and watch ${agent}'s walkthrough`;
+      return view.track === "engineering"
+        ? view.scenario.artifactKind && view.scenario.artifactKind !== "code"
+          ? `Open Review and inspect ${agent}'s deliverable`
+          : `Open Review and check ${agent}'s pull request`
+        : `Open Review and watch ${agent}'s walkthrough`;
     case "release":
       return "Open Launch and decide how to release";
     default:
@@ -163,7 +168,9 @@ export function guideFor(view: ProjectView): string[] {
         `${agent} does exactly what you ask and fills every gap with its own assumptions.`,
         product
           ? "Say what to make, what must never happen, and what's out of scope."
-          : "Name the constraints, what's out of scope, and how you'll check the result (a test).",
+          : view.scenario.artifactKind && view.scenario.artifactKind !== "code"
+            ? "Name the domain rules, what must never happen, and what's out of scope."
+            : "Name the constraints, what's out of scope, and how you'll check the result (a test).",
       ];
     case "review":
       return product
@@ -173,11 +180,18 @@ export function guideFor(view: ProjectView): string[] {
             "If something would hurt the client, send it back with the reason. A wrong reason costs a day.",
             "Approve when you're satisfied.",
           ]
-        : [
-            `Read ${agent}'s pull request in Review: the diff and the checks.`,
-            "If a line is wrong, click it and request changes. A wrong line costs a day.",
-            "Approve and merge when you're satisfied.",
-          ];
+        : view.scenario.artifactKind && view.scenario.artifactKind !== "code"
+          ? [
+              `Inspect ${agent}'s deliverable in Review entry by entry.`,
+              ...(view.conceptCount ? ["When you flag an entry, explain what goes wrong and why it happens."] : []),
+              "Click the flawed entry and send it back. Flagging a sound entry costs a day.",
+              "Approve when you're satisfied.",
+            ]
+          : [
+              `Read ${agent}'s pull request in Review: the diff and the checks.`,
+              "If a line is wrong, click it and request changes. A wrong line costs a day.",
+              "Approve and merge when you're satisfied.",
+            ];
     case "release":
       return [
         `Open Launch and choose how ${deliverable} reaches ${client}'s people.`,

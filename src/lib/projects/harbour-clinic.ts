@@ -99,6 +99,7 @@ export const harbourClinic: ProjectScenario = {
       "Grace Wong, practice manager at Harbour Family Clinic, a small family clinic. Friendly, busy and not technical. Speaks in short, natural sentences, sometimes mentions patients or staff by name. Cares about the budget and about not upsetting patients. Describes solutions ('an app like the big clinics') rather than problems unless asked good questions.",
   },
   assistant: { name: "Cody", kind: "AI coding agent" },
+  artifactKind: "code",
   cast: [
     { kind: "client", name: "Grace Wong", role: "Practice manager, Harbour Family Clinic", note: "Your client. Busy, not technical, knows how the front desk really works." },
     { kind: "manager", name: "Leo", role: "Your manager at the studio", note: "Gave this job two weeks. Watches the budget." },
@@ -467,6 +468,24 @@ export const harbourClinic: ProjectScenario = {
     },
   ],
   testFile: bookingTest,
+  viva: {
+    question:
+      "Before Mandy and Kit use this tomorrow morning: what stops two receptionists from booking the same slot at the same second, and how will we know within a week that the fix actually held?",
+    items: [
+      {
+        id: "V1",
+        label: "Explains the save-time / simultaneous booking safeguard or keeping cancelled records",
+        competency: "discernment",
+        cues: [["same time", "same moment", "simultaneous", "unique", "database", "save", "reject", "cancel", "history", "record"]],
+      },
+      {
+        id: "V2",
+        label: "Explains piloting with one receptionist or counting weekly double bookings against the target",
+        competency: "diligence",
+        cues: [["fewer than one", "less than one", "double booking", "dr lee", "one receptionist", "mandy"]],
+      },
+    ],
+  },
   reviewReasons: [
     { id: "double-booking", label: "Two people can still book the same slot" },
     { id: "cancel-deletes", label: "Cancelled appointments disappear from the history" },
@@ -500,6 +519,7 @@ export const harbourClinic: ProjectScenario = {
       "changes-wrong": "You sent Cody's work back for the wrong reason, and Grace asked why it was taking longer.",
       "release-measure": "You released with a weekly count against Grace's target.",
       "release-now": "You switched the whole clinic over at once, with no way to catch a problem early.",
+      "viva-strong": "Grace appreciated your clear sign-off explanation before rollout.",
     },
     outcome: {
       success: { delta: 1, reason: "The weekly count showed the problem is solved." },

@@ -163,6 +163,19 @@ export function Report({ view, busy, onClose, onRestart, exit }: { view: Project
             </div>
           </div>
         )}
+        {view.viva?.response && (
+          <div className="border-t border-black/10 px-6 py-5 text-[13px]">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[15px] font-semibold text-stone-900">Sign-off defense (Live Viva)</h2>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${RATING[view.viva.response.rating]}`}>
+                {view.viva.response.rating}
+              </span>
+            </div>
+            <p className="mt-1.5 text-stone-600">&ldquo;{view.viva.question}&rdquo;</p>
+            <p className="mt-2 rounded-lg border border-black/10 bg-stone-50 p-3 italic text-stone-800">&ldquo;{view.viva.response.text}&rdquo;</p>
+            <p className="mt-2 text-stone-700">{view.viva.response.feedback}</p>
+          </div>
+        )}
         <div className="flex flex-wrap justify-end gap-2 border-t border-black/10 px-6 py-4">
           <a href={exit.href} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">{exit.label}</a>
           <button type="button" onClick={onClose} className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-800">Look around</button>
@@ -206,8 +219,17 @@ export function Notifications({ notices, onOpen, onDismiss }: { notices: Notice[
 export function ProjectWidget({ view, onOpenApp }: { view: ProjectView; onOpenApp: (app: AppId) => void }) {
   const current = stepIndex(view);
   const steps = stepsFor(view);
-  // Generated projects have one way in, so there is no product/tech split to name.
-  const role = view.track === "engineering" ? "Tech lead" : view.scenario.id.startsWith("gen-") ? "Project lead" : "Product lead";
+  const isCode = !view.scenario.artifactKind || view.scenario.artifactKind === "code";
+  const role =
+    view.track === "engineering"
+      ? isCode
+        ? "Tech lead"
+        : "Specialist reviewer"
+      : view.scenario.id.startsWith("gen-") && !view.scenario.artifactKind
+        ? "Project lead"
+        : isCode
+          ? "Product lead"
+          : "Overview lead";
   const { effort, effortMax, trust } = view.meters;
   const guide = guideFor(view);
   return (

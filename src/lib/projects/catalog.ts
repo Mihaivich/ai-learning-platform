@@ -61,4 +61,45 @@ export const wardInfectionAuditListing = {
   ideas: ["Rates vs raw counts", "Confounding variables"],
 } as const satisfies ProjectListing;
 
-export const projectListings: readonly ProjectListing[] = [harbourClinicListing, tidewaterSwimListing, parcelPalListing, wardInfectionAuditListing];
+export const sunsetDaycareListing = {
+  id: "sunset-daycare",
+  title: "Sunset Daycare pickup policy",
+  tagline: "Design a behavioural intervention with an AI policy analyst without backfiring on late pickups.",
+  summary:
+    "Parents keep arriving after 5:30 PM at Sunset Daycare, leaving exhausted teachers on overtime. Investigate why a small fee backfired in one room, guide your AI policy analyst, audit its trial workbook and defend the rollout plan.",
+  minutes: 20,
+  field: "beyond",
+  ideas: ["Crowding out", "Selection bias"],
+} as const satisfies ProjectListing;
+
+export const beanAndBreadListing = {
+  id: "bean-and-bread",
+  title: "Bean & Bread loyalty pass",
+  tagline: "Launch a compliant café loyalty scheme with an AI marketing & legal-copy agent.",
+  summary:
+    "Bean & Bread loses morning commuters when counter queues stall, yet its owner asks for a full chain-style mobile app. Uncover the rush-hour snag and SMS consent law, brief your AI agent, redline its campaign terms and defend the launch.",
+  minutes: 20,
+  field: "beyond",
+  ideas: ["Cycle time", "Opt-in privacy"],
+} as const satisfies ProjectListing;
+
+export const riverNitrateLabListing = {
+  id: "river-nitrate-lab",
+  title: "River Meadow nitrate SOP",
+  tagline: "Validate an environmental water-testing protocol with an AI lab-methods agent.",
+  summary:
+    "Volunteer river-watchers keep getting wildly inconsistent nitrate readings downstream of Meadow Farm. Investigate how blanks are zeroed and how bottles travel back to the bench, brief your AI lab agent, review its SOP steps and defend sign-off.",
+  minutes: 20,
+  field: "beyond",
+  ideas: ["Matrix blank", "Cold chain"],
+} as const satisfies ProjectListing;
+
+export const projectListings: readonly ProjectListing[] = [
+  harbourClinicListing,
+  tidewaterSwimListing,
+  parcelPalListing,
+  wardInfectionAuditListing,
+  sunsetDaycareListing,
+  beanAndBreadListing,
+  riverNitrateLabListing,
+];

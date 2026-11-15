@@ -4,10 +4,21 @@ import type { ProjectDraft } from "./generated/draft";
 import { parcelPal, parcelPalDraft } from "./parcelpal";
 import { tidewaterSwim, tidewaterSwimDraft } from "./tidewater-swim";
 import { wardInfectionAudit, wardInfectionAuditDraft } from "./ward-infection-audit";
+import { sunsetDaycare, sunsetDaycareDraft } from "./sunset-daycare";
+import { beanAndBread, beanAndBreadDraft } from "./bean-and-bread";
+import { riverNitrateLab, riverNitrateLabDraft } from "./river-nitrate-lab";
 import { isGeneratedId, loadGeneratedScenario } from "./generated/store";
 import type { ProjectScenario } from "./types";
 
-export const projectScenarios: ProjectScenario[] = [harbourClinic, tidewaterSwim, parcelPal, wardInfectionAudit];
+export const projectScenarios: ProjectScenario[] = [
+  harbourClinic,
+  tidewaterSwim,
+  parcelPal,
+  wardInfectionAudit,
+  sunsetDaycare,
+  beanAndBread,
+  riverNitrateLab,
+];
 
 /** The built-in projects as drafts, for instructors to customise with the AI. */
 export const BUILT_IN_DRAFTS: Record<string, ProjectDraft> = {
@@ -15,6 +26,9 @@ export const BUILT_IN_DRAFTS: Record<string, ProjectDraft> = {
   "tidewater-swim": tidewaterSwimDraft,
   parcelpal: parcelPalDraft,
   "ward-infection-audit": wardInfectionAuditDraft,
+  "sunset-daycare": sunsetDaycareDraft,
+  "bean-and-bread": beanAndBreadDraft,
+  "river-nitrate-lab": riverNitrateLabDraft,
 };
 
 /** A built-in project, written in code. */

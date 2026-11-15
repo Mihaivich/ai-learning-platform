@@ -3,39 +3,54 @@
 import { useState } from "react";
 import type { ProjectView } from "@/lib/projects/runtime";
 import { Avatar } from "../icons";
-import { reviewRepo, type Send } from "../config";
+import { initials, reviewRepo, type Send } from "../config";
 
-/** The AI assistant (Cody in Harbour Clinic): the learner writes its task here. */
+/** The AI assistant: the learner writes its task here, in any domain. */
 export function CodyApp({ view, busy, send, onOpenReview }: { view: ProjectView; busy: boolean; send: Send; onOpenReview: () => void }) {
   const writing = view.stage.id === "brief" && view.status === "active";
   const [text, setText] = useState("");
   const engineering = view.track === "engineering";
+  const isCode = view.scenario.artifactKind === "code";
   const agent = view.scenario.assistant.name;
+  const kind = view.scenario.assistant.kind;
+  const steps =
+    view.scenario.assistant.workSteps ??
+    (isCode
+      ? ["reading task", "planning changes", "writing code and migrations"]
+      : ["reading your brief", `drafting ${view.scenario.words.deliverable}`, "running consistency checks"]);
+
+  const deliveryLabel = engineering
+    ? isCode
+      ? "opened a pull request"
+      : "prepared the deliverable for specialist review"
+    : "recorded a walkthrough";
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#14121c] font-mono text-[13px] text-violet-100">
       <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3 font-sans">
-        <Avatar initials="C" tone="from-violet-500 to-fuchsia-500" size={32} />
+        <Avatar initials={initials(agent)} tone="from-violet-500 to-fuchsia-500" size={32} />
         <div>
           <p className="font-semibold text-white">{agent}</p>
-          <p className="text-[12px] text-violet-300/70">Autonomous coding agent · builds exactly what the task says</p>
+          <p className="text-[12px] text-violet-300/70">{kind} · follows your brief literally</p>
         </div>
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <p className="text-violet-300/80">
-          <span className="text-fuchsia-400">{agent.toLowerCase()}</span> ready. Waiting for a task for <span className="text-white">{reviewRepo(view)}</span>.
+          <span className="text-fuchsia-400">{agent.toLowerCase()}</span> ready. Waiting for a brief for <span className="text-white">{reviewRepo(view)}</span>.
         </p>
         {view.brief && (
           <>
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <p className="mb-1 text-[11px] uppercase tracking-wide text-violet-300/60">Your task</p>
+              <p className="mb-1 text-[11px] uppercase tracking-wide text-violet-300/60">Your brief</p>
               <p className="whitespace-pre-line font-sans text-[13px] text-white">{view.brief.text}</p>
             </div>
             <div className="space-y-1 text-violet-200/80">
-              <p>▸ reading task… done</p>
-              <p>▸ planning changes… done</p>
-              <p>▸ writing code and migrations… done</p>
-              <p className="text-emerald-300">✓ {engineering ? "opened a pull request" : "recorded a walkthrough"}: {view.work?.prTitle ?? view.scenario.words.deliverable}</p>
+              {steps.map((step, index) => (
+                <p key={index}>▸ {step}… done</p>
+              ))}
+              <p className="text-emerald-300">
+                ✓ {deliveryLabel}: {view.work?.prTitle ?? view.scenario.words.deliverable}
+              </p>
             </div>
             {view.work && (
               <button type="button" onClick={onOpenReview} className="rounded-md bg-violet-600 px-3 py-1.5 font-sans font-medium text-white hover:bg-violet-500">
@@ -66,7 +81,7 @@ export function CodyApp({ view, busy, send, onOpenReview }: { view: ProjectView;
             void send({ op: "brief", text });
           }}
         >
-          <label htmlFor="cody-task" className="text-[12px] font-medium text-violet-200">Task for {agent}</label>
+          <label htmlFor="cody-task" className="text-[12px] font-medium text-violet-200">Brief for {agent}</label>
           <textarea
             id="cody-task"
             value={text}
@@ -74,9 +89,9 @@ export function CodyApp({ view, busy, send, onOpenReview }: { view: ProjectView;
             rows={6}
             maxLength={3000}
             placeholder={
-              engineering
+              engineering && isCode
                 ? `Describe the task, the constraints ${agent} must respect, what's out of scope and how you'll check the result.`
-                : `Describe what ${agent} should make, what it must never do, and what's out of scope.`
+                : `Describe what ${agent} should produce, what must never happen, and what's out of scope.`
             }
             className="mt-1 w-full resize-y rounded-lg border border-white/15 bg-white/5 p-3 text-[13px] text-white placeholder:text-violet-300/40 outline-none focus:border-fuchsia-400"
           />
