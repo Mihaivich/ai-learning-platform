@@ -20,6 +20,8 @@ export type ProjectFact = {
   cues: string[];
   /** What the client says when the fact comes up, in their own voice. */
   reply: string;
+  /** Natural example question a learner might ask to uncover this fact. Server-only. */
+  sampleQuestion?: string;
 };
 
 /**
@@ -171,6 +173,8 @@ export type ProjectScenario = {
   stageKinds: Record<string, StageKind>;
   /** Track-specific wording for a stage, shown instead of the engine narrative. */
   trackNarratives?: Partial<Record<string, Partial<Record<Track, string>>>>;
+  /** Optional server-only golden examples (used to derive natural composer clauses). */
+  samples?: { requirements: string; brief: string };
   debriefNotes: DebriefNotes;
   config: SimulationConfig;
 };

@@ -8,6 +8,14 @@ import {
   type SimulationState,
 } from "@/lib/learning/simulation/engine";
 import type { SimulationOutcome } from "@/lib/learning/simulation/schema";
+import {
+  buildBriefComposer,
+  buildRequirementsComposer,
+  buildReviewNoteOptions,
+  buildSuggestedQuestions,
+  type ComposerOption,
+  type ComposerSlot,
+} from "./composer";
 import { normalise, type Grader, type InterviewTurn, type ProjectEvaluator } from "./evaluate";
 import type {
   ChecklistItem,
@@ -298,6 +306,40 @@ export function requestChanges(
   return system(scenario, next, correct ? "changes-fixed" : "changes-wrong");
 }
 
+const MECHANISM_STOPS = new Set([
+  "that", "this", "these", "those", "with", "from", "when", "what", "which", "where", "there", "their",
+  "they", "them", "then", "than", "into", "only", "even", "such", "some", "many",
+  "more", "most", "much", "also", "very", "just", "often", "already", "once", "both",
+  "each", "same", "other", "another", "because", "instead", "before", "after", "until",
+  "unless", "while", "during", "between", "under", "over", "about", "against", "without",
+  "within", "through", "across", "every", "never", "still", "happens", "means", "shows",
+  "people", "someone", "something", "cancelling", "deletes", "deleted", "deleting",
+]);
+
+function causalExplanationCues(concept: ProjectConcept, nameCues: string[]): string[] {
+  const sentences = concept.explanation.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  const conceptLower = concept.name.trim().toLowerCase();
+  const singular = conceptLower.endsWith("s") && conceptLower.length >= 6 ? conceptLower.slice(0, -1) : conceptLower;
+  const bigrams: string[] = [];
+
+  for (const sentence of sentences) {
+    const stripped = sentence
+      .toLowerCase()
+      .split(conceptLower).join(" ")
+      .split(singular).join(" ");
+    const words = normalise(stripped).trim().split(/\s+/);
+    for (let i = 0; i < words.length - 1; i++) {
+      const a = words[i];
+      const b = words[i + 1];
+      if (a.length < 4 || b.length < 4) continue;
+      if (MECHANISM_STOPS.has(a) || MECHANISM_STOPS.has(b)) continue;
+      if (nameCues.some((cue) => a.startsWith(cue) || b.startsWith(cue))) continue;
+      bigrams.push(`${a} ${b}`);
+    }
+  }
+  return Array.from(new Set(bigrams));
+}
+
 /**
  * What the learner's note has to say about a concept: what goes wrong with the
  * flawed version, and the idea that explains it.
@@ -306,9 +348,10 @@ export function explanationItems(scenario: ProjectScenario, concept: ProjectConc
   const variant = scenario.variants.find((item) => item.id === concept.variant);
   const symptom = scenario.reviewReasons.find((reason) => reason.id === variant?.problemReason)?.label ?? concept.inTheJob;
   const nameCues = normalise(concept.name).trim().split(" ").filter((word) => word.length >= 4).map((word) => word.slice(0, 5));
+  const whyCues = Array.from(new Set([...nameCues, ...causalExplanationCues(concept, nameCues)]));
   return [
     { id: "what", label: `Says what goes wrong with this version, in any words: ${symptom}`, competency: "discernment", cues: [concept.cues] },
-    { id: "why", label: `Explains why, with the idea of ${concept.name}. The belief "${concept.misconception}" is wrong.`, competency: "discernment", cues: [nameCues] },
+    { id: "why", label: `Explains why, with the idea of ${concept.name}. The belief "${concept.misconception}" is wrong.`, competency: "discernment", cues: [whyCues] },
   ];
 }
 
@@ -383,6 +426,7 @@ export type ProjectView = {
   interview: {
     opening: string;
     turns: InterviewTurn[];
+    suggestedQuestions: string[];
     asked: number;
     min: number;
     max: number;
@@ -391,7 +435,9 @@ export type ProjectView = {
   /** How many concepts the job teaches. They are named and explained in the report, after the release. */
   conceptCount: number;
   requirements: { text: string; coveredCount: number; total: number } | null;
+  requirementsComposer: ComposerSlot[];
   brief: { text: string } | null;
+  briefComposer: ComposerSlot[];
   work: {
     prTitle: string;
     prSummary: string;
@@ -399,6 +445,7 @@ export type ProjectView = {
     checks: CodeVariant["checks"];
     demo: CodeVariant["demo"];
     reasons: ProjectScenario["reviewReasons"];
+    noteOptions: ComposerOption[];
     reviews: {
       label: string;
       correct: boolean;
@@ -666,6 +713,7 @@ export function projectView(
       opening: scenario.interview.opening,
       // Graders are kept for the teacher, not shown to the learner.
       turns: memo.interview.turns.map(({ role, text }) => ({ role, text })),
+      suggestedQuestions: buildSuggestedQuestions(scenario, memo.interview.turns),
       asked: memo.interview.turns.filter((turn) => turn.role === "learner").length,
       min: scenario.interview.minQuestions,
       max: scenario.interview.maxQuestions,
@@ -683,7 +731,9 @@ export function projectView(
           total: itemsFor(scenario.requirements, track).length,
         }
       : null,
+    requirementsComposer: buildRequirementsComposer(scenario, track, memo.interview.revealed),
     brief: memo.brief ? { text: memo.brief.text } : null,
+    briefComposer: buildBriefComposer(scenario, track, memo.interview.revealed),
     work: showWork
       ? {
           prTitle: variant.prTitle,
@@ -697,6 +747,7 @@ export function projectView(
           checks: track === "engineering" && state.variables.hasTest === true ? variant.checks : [],
           demo: track === "product" ? variant.demo : [],
           reasons: track === "product" ? scenario.reviewReasons : [],
+          noteOptions: buildReviewNoteOptions(scenario),
           reviews: memo.reviews.map((review) => {
             const concept = scenario.concepts?.find((item) => item.id === review.explanation?.concept);
             const feedback = concept && review.explanation ? explanationFeedback(scenario, concept, review.explanation.covered) : null;

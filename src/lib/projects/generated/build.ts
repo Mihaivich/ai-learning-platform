@@ -74,6 +74,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
     text: draft.facts[role].text,
     cues: draft.facts[role].cues,
     reply: draft.facts[role].reply,
+    sampleQuestion: draft.facts[role].sampleQuestion,
   }));
 
   const requirements: ChecklistItem[] = [
@@ -176,6 +177,7 @@ export function buildScenario(draft: ProjectDraft, meta: { id: string; version?:
       { id: "scope", label: draft.reviewReasons.scope },
       { id: "distractor", label: draft.reviewReasons.distractor },
     ],
+    samples: draft.samples,
     ...(engineering ? { testFile: engineering.test.file } : {}),
     stageKinds: {
       "choose-track": "choice",

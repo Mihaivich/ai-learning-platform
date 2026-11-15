@@ -148,6 +148,7 @@ export const harbourClinic: ProjectScenario = {
       cues: ["happen", "wrong", "double", "same time", "same slot", "spreadsheet", "morning", "rush", "busy", "cause", "why", "reception", "mandy", "kit"],
       reply:
         "It's always the morning rush, about half eight to half nine. Mandy and Kit both have the spreadsheet open and both type into the same row. Neither of them notices until two patients turn up.",
+      sampleQuestion: "When do the double bookings happen at the front desk, and why?",
     },
     {
       id: "F2",
@@ -155,6 +156,7 @@ export const harbourClinic: ProjectScenario = {
       cues: ["cancel", "record", "history", "delete", "rule", "regulation", "audit", "keep", "data"],
       reply:
         "Oh, cancellations must stay on file. We keep the appointment history for seven years, the auditors check it. Right now we just colour the row grey.",
+      sampleQuestion: "What should happen to the appointment record when someone cancels?",
     },
     {
       id: "F3",
@@ -162,6 +164,7 @@ export const harbourClinic: ProjectScenario = {
       cues: ["patient", "app", "who will use", "user", "budget", "cost", "money", "online", "phone", "scope"],
       reply:
         "Honestly, most of our patients just ring us. The board hasn't approved any patient app. Leo said you can give us about two weeks, and that's what we can pay for.",
+      sampleQuestion: "Who will use this tool day to day, and what budget do we have?",
     },
     {
       id: "F4",
@@ -169,6 +172,7 @@ export const harbourClinic: ProjectScenario = {
       cues: ["slot", "length", "minutes", "doctor", "schedule", "hours", "shift", "long is"],
       reply:
         "Every appointment is fifteen minutes. Dr Lee is in every day, Dr Chan only Tuesday and Thursday mornings.",
+      sampleQuestion: "How long are the appointment slots and which days are the doctors in?",
     },
     {
       id: "F5",
@@ -176,6 +180,7 @@ export const harbourClinic: ProjectScenario = {
       cues: ["computer", "pc", "device", "laptop", "browser", "install", "equipment", "tablet", "hardware"],
       reply:
         "We've got one old PC at the front desk, the clinic's IT won't let us install anything. Chrome works, that's about it.",
+      sampleQuestion: "What computer and browser does reception run right now?",
     },
     {
       id: "F6",
@@ -183,6 +188,7 @@ export const harbourClinic: ProjectScenario = {
       cues: ["success", "measure", "fixed", "goal", "good", "better", "how will you know", "target", "result"],
       reply:
         "If we got it down to less than one double booking a week, I'd be thrilled. Right now it's three or four.",
+      sampleQuestion: "How will you measure success once the booking tool goes live?",
     },
   ],
   inbox: [
@@ -526,6 +532,12 @@ export const harbourClinic: ProjectScenario = {
       C3: "Your brief didn't limit the scope, so Cody added a patient portal nobody asked for.",
       C4: "Your brief didn't ask for a test, so nothing would have caught a double booking before release.",
     },
+  },
+  samples: {
+    requirements:
+      "The same doctor and slot must never be booked twice, even when Mandy and Kit save at the same time. Cancelling must keep the appointment on record marked as cancelled for seven years of history. Build a staff-only reception tool with no patient login. It must run in Chrome on the existing PC with no install. Target fewer than one double booking per week.",
+    brief:
+      "Reject any booking for a taken doctor and slot at the moment it is saved in the database so two simultaneous saves cannot both succeed. Cancelling must mark the appointment as cancelled and keep the history without deleting records. Build only the staff booking board with no patient portal, accounts, reminders, or payments. Include an automated unit test proving two simultaneous bookings for the same slot cannot both succeed.",
   },
   // Parsed once at load: applies schema defaults and fails fast on invalid content.
   config: simulationConfigSchema.parse({

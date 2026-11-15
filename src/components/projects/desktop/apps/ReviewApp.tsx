@@ -140,18 +140,43 @@ export function ReviewApp({ view, busy, send }: { view: ProjectView; busy: boole
               </fieldset>
             )}
             {needsNote && !fixed && (
-              <label className="mb-3 block">
-                <span className="font-medium text-stone-900">Your note for {agent}</span>
-                <span className="block text-stone-500">What goes wrong, and why? {agent} learns from the why.</span>
+              <div className="mb-3 space-y-2">
+                <label className="block">
+                  <span className="font-medium text-stone-900">Your note for {agent}</span>
+                  <span className="block text-stone-500">What goes wrong, and why? {agent} learns from the why.</span>
+                </label>
+                {(picked || reason) && work.noteOptions.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-medium text-stone-500">
+                      Click a note starter below, or write your own explanation:
+                    </p>
+                    <div className="grid max-h-36 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
+                      {work.noteOptions.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setNote(opt.text)}
+                          className={`rounded-md border px-2.5 py-1.5 text-left text-[12px] transition ${
+                            note === opt.text
+                              ? "border-blue-500 bg-blue-50 text-stone-900"
+                              : "border-black/10 bg-stone-50 text-stone-700 hover:border-blue-300"
+                          }`}
+                        >
+                          {opt.text}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <textarea
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
                   maxLength={1000}
                   rows={3}
                   placeholder="This breaks when… because…"
-                  className="mt-1.5 w-full resize-none rounded-md border border-black/15 px-2.5 py-1.5 text-stone-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full resize-none rounded-md border border-black/15 px-2.5 py-1.5 text-stone-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 />
-              </label>
+              </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
               {!fixed && (

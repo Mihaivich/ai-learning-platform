@@ -9,8 +9,18 @@ import { reviewRepo, type Send } from "../config";
 export function CodyApp({ view, busy, send, onOpenReview }: { view: ProjectView; busy: boolean; send: Send; onOpenReview: () => void }) {
   const writing = view.stage.id === "brief" && view.status === "active";
   const [text, setText] = useState("");
+  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [manual, setManual] = useState(false);
   const engineering = view.track === "engineering";
   const agent = view.scenario.assistant.name;
+
+  const slots = view.briefComposer;
+  const composed = slots
+    .map((slot) => slot.options.find((opt) => opt.id === selected[slot.id])?.text)
+    .filter(Boolean)
+    .join(" ");
+  const activeText = manual ? text : composed;
+  const allPicked = slots.length > 0 && slots.every((slot) => Boolean(selected[slot.id]));
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#14121c] font-mono text-[13px] text-violet-100">
@@ -60,31 +70,113 @@ export function CodyApp({ view, busy, send, onOpenReview }: { view: ProjectView;
       </div>
       {writing && (
         <form
-          className="border-t border-white/10 p-3 font-sans"
+          className="max-h-[55%] overflow-y-auto border-t border-white/10 p-3 font-sans"
           onSubmit={(event) => {
             event.preventDefault();
-            void send({ op: "brief", text });
+            void send({ op: "brief", text: activeText });
           }}
         >
-          <label htmlFor="cody-task" className="text-[12px] font-medium text-violet-200">Task for {agent}</label>
-          <textarea
-            id="cody-task"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            rows={6}
-            maxLength={3000}
-            placeholder={
-              engineering
-                ? `Describe the task, the constraints ${agent} must respect, what's out of scope and how you'll check the result.`
-                : `Describe what ${agent} should make, what it must never do, and what's out of scope.`
-            }
-            className="mt-1 w-full resize-y rounded-lg border border-white/15 bg-white/5 p-3 text-[13px] text-white placeholder:text-violet-300/40 outline-none focus:border-fuchsia-400"
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label htmlFor="cody-task" className="text-[12px] font-medium text-violet-200">Task for {agent}</label>
+            <div className="inline-flex rounded-md border border-white/15 bg-white/5 p-0.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setManual(false)}
+                className={`rounded px-2 py-0.5 font-medium ${!manual ? "bg-violet-600 text-white" : "text-violet-200"}`}
+              >
+                Build from cards
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!text.trim() && composed) setText(composed);
+                  setManual(true);
+                }}
+                className={`rounded px-2 py-0.5 font-medium ${manual ? "bg-violet-600 text-white" : "text-violet-200"}`}
+              >
+                Write / edit custom prompt
+              </button>
+            </div>
+          </div>
+          {manual ? (
+            <textarea
+              id="cody-task"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              rows={6}
+              maxLength={3000}
+              placeholder={
+                engineering
+                  ? `Describe the task, the constraints ${agent} must respect, what's out of scope and how you'll check the result.`
+                  : `Describe what ${agent} should make, what it must never do, and what's out of scope.`
+              }
+              className="mt-1.5 w-full resize-y rounded-lg border border-white/15 bg-white/5 p-3 text-[13px] text-white placeholder:text-violet-300/40 outline-none focus:border-fuchsia-400"
+            />
+          ) : (
+            <div className="mt-2 space-y-2.5">
+              {slots.map((slot) => (
+                <fieldset key={slot.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <legend className="text-[12px] font-medium text-violet-100">{slot.prompt}</legend>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        slot.unlocked ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-200"
+                      }`}
+                    >
+                      {slot.unlocked ? "Backed by call notes" : "Unverified assumption — not discussed on call"}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 grid gap-1.5">
+                    {slot.options.map((opt) => {
+                      const isPicked = selected[slot.id] === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setSelected((prev) => ({ ...prev, [slot.id]: opt.id }))}
+                          aria-pressed={isPicked}
+                          className={`rounded-md border px-2.5 py-1.5 text-left text-[12px] transition ${
+                            isPicked
+                              ? "border-fuchsia-400 bg-fuchsia-500/20 text-white"
+                              : "border-white/10 bg-black/20 text-violet-100/85 hover:border-violet-400/60"
+                          }`}
+                        >
+                          {opt.text}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+              {composed && (
+                <div className="rounded-md border border-white/10 bg-black/30 p-2 text-[12px] text-violet-100">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-wide text-violet-300/70">Composed prompt</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setText(composed);
+                        setManual(true);
+                      }}
+                      className="text-[11px] font-medium text-fuchsia-300 hover:underline"
+                    >
+                      Edit wording manually
+                    </button>
+                  </div>
+                  <p className="mt-1 leading-relaxed">{composed}</p>
+                </div>
+              )}
+            </div>
+          )}
           <div className="mt-2 flex items-center gap-3">
-            <button type="submit" disabled={busy || !text.trim()} className="rounded-md bg-fuchsia-600 px-4 py-1.5 font-medium text-white disabled:opacity-40">
+            <button
+              type="submit"
+              disabled={busy || !activeText.trim() || (!manual && !allPicked)}
+              className="rounded-md bg-fuchsia-600 px-4 py-1.5 font-medium text-white disabled:opacity-40"
+            >
               {busy ? `${agent} is working…` : "Run task"}
             </button>
-            <span className="tabular-nums text-violet-300/60">{text.length} / 3000</span>
+            <span className="tabular-nums text-violet-300/60">{activeText.length} / 3000</span>
           </div>
         </form>
       )}

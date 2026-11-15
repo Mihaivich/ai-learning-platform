@@ -11,7 +11,7 @@ export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean
   const [pending, setPending] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const live = view.stage.id === "interview" && view.status === "active";
-  const { turns, asked, min, max, opening } = view.interview;
+  const { turns, asked, min, max, opening, suggestedQuestions } = view.interview;
   const client = view.scenario.client;
   const happened = live || turns.length > 0;
 
@@ -30,15 +30,22 @@ export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean
     );
   }
 
+  async function askText(rawText: string) {
+    const text = rawText.trim();
+    if (!text || busy || asked >= max) return false;
+    setPending(text);
+    const ok = await send({ op: "ask", question: text });
+    setPending(null);
+    return ok;
+  }
+
   async function ask(event: React.FormEvent) {
     event.preventDefault();
     const text = question.trim();
     if (!text || busy) return;
     // Clear straight away so the learner can type the next question while the client answers.
     setQuestion("");
-    setPending(text);
-    const ok = await send({ op: "ask", question: text });
-    setPending(null);
+    const ok = await askText(text);
     if (!ok) setQuestion((current) => current || text);
   }
 
@@ -72,6 +79,26 @@ export function CallApp({ view, busy, send }: { view: ProjectView; busy: boolean
         </div>
         {live && (
           <div className="border-t border-white/10 p-3">
+            {suggestedQuestions.length > 0 && asked < max && (
+              <div className="mb-2.5">
+                <p className="mb-1.5 text-[11px] font-medium text-stone-400">
+                  Possible questions to ask {firstName(client.name)} (pick carefully — your time is limited):
+                </p>
+                <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                  {suggestedQuestions.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      disabled={busy || asked >= max}
+                      onClick={() => void askText(q)}
+                      className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-left text-[12px] text-stone-200 transition hover:border-emerald-400/60 hover:bg-white/10 disabled:opacity-40"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <form onSubmit={ask} className="flex gap-2">
               <label htmlFor="meet-question" className="sr-only">Your question</label>
               <input
