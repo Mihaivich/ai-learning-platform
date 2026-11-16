@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
 import { buttonPrimary } from "@/components/blocks/BlockCard";
 import { isDatabaseCourseId } from "@/lib/learning/ids";
+import { activityHistory } from "@/lib/learning/attempt-history";
 import {
   completionThreshold,
-  sameActivityContent,
   validateActivity,
   type ActivityType,
   type LearningActivity,
@@ -37,26 +37,32 @@ function useAttempts(props: ViewProps) {
   }, [props.onResult]);
   const minimum = completionThreshold(props.block);
   const [history, setHistory] = useState<AttemptRow[]>([]);
-  const [feedback, setFeedback] = useState<LearningFeedback | null>(null);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [savedNote, setSavedNote] = useState("");
   const blockKey = JSON.stringify(props.block);
+  const ephemeral = props.preview || !isDatabaseCourseId(props.courseId);
+  const current = activityHistory(history, props.block, props.lessonId, { ephemeral });
   useEffect(() => {
     if (props.preview || !isDatabaseCourseId(props.courseId)) return;
     let active = true;
     const snapshot: LearningActivity = JSON.parse(blockKey);
     fetch(`/api/activities?courseId=${props.courseId}`)
-      .then((response) => response.json())
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load earlier attempts.");
+        return response.json();
+      })
       .then((rows) => {
         if (!active || !Array.isArray(rows)) return;
-        const mine = (rows as AttemptRow[]).filter(
-          (row) => row.activity_id === snapshot.id && row.lesson_id === props.lessonId,
-        );
+        const mine = activityHistory(rows as AttemptRow[], snapshot, props.lessonId).attempts;
         setHistory(mine);
-        if (mine.length) setFeedback(mine[mine.length - 1].feedback);
         onResult.current({
-          done: matching(mine, snapshot).length >= completionThreshold(snapshot),
+          done: mine.length >= completionThreshold(snapshot),
         });
       })
       .catch(() => {
@@ -70,7 +76,6 @@ function useAttempts(props: ViewProps) {
     setBusy(true);
     setError("");
     try {
-      const ephemeral = props.preview || !isDatabaseCourseId(props.courseId);
       const result = await fetch("/api/activities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,23 +86,23 @@ function useAttempts(props: ViewProps) {
           response,
           action: "submit",
           preview: !!props.preview,
+          previewAttemptCount: ephemeral ? current.previousAttemptCount : undefined,
           previewHistory: ephemeral
-            ? history.slice(-8).map((row) => ({
-                response: row.response,
-                feedback: row.feedback,
-              }))
+            ? current.previous
             : undefined,
         }),
       });
       const data = await result.json();
+      if (!active.current) return false;
       if (!result.ok) throw new Error(data.error);
       const next: AttemptRow = {
+        activity_id: props.block.id,
+        lesson_id: props.lessonId,
         response: data.response,
         feedback: data.feedback,
-        activity_snapshot: data.activity_snapshot,
+        activity_snapshot: data.activity_snapshot ?? (ephemeral ? props.block : undefined),
         score: data.score,
       };
-      setFeedback(data.feedback);
       setHistory((current) => [...current, next]);
       setSavedNote(
         data.saved
@@ -105,18 +110,22 @@ function useAttempts(props: ViewProps) {
           : "This attempt is kept in the session only. Preview and the static presentation courses do not write the gradebook.",
       );
       onResult.current({
-        done: Boolean(data.complete),
+        done: activityHistory([next], props.block, props.lessonId, { ephemeral }).attempts.length > 0 && Boolean(data.complete),
         ...(data.score === null || data.score === undefined ? {} : { score: data.score }),
       });
       return true;
     } catch (cause) {
-      setError((cause as Error).message);
+      if (active.current) setError((cause as Error).message);
       return false;
     } finally {
-      setBusy(false);
+      if (active.current) setBusy(false);
     }
   }
-  return { history, feedback, busy, error, savedNote, submit, minimum };
+  return {
+    history: current.attempts,
+    feedback: current.attempts.at(-1)?.feedback ?? null,
+    busy, error, savedNote, submit, minimum,
+  };
 }
 
 function FeedbackPanel({
@@ -174,10 +183,6 @@ function FeedbackPanel({
       )}
     </>
   );
-}
-
-function matching(rows: AttemptRow[], block: LearningActivity) {
-  return rows.filter((row) => sameActivityContent(row.activity_snapshot ?? block, block));
 }
 
 function ChoiceView(props: ViewProps & { block: Extract<LearningActivity, { activityType: "choice" }> }) {
@@ -425,6 +430,7 @@ export function ActivityView({
   ) => React.ReactNode;
   return (
     <Renderer
+      key={JSON.stringify([courseId, lessonId, preview, parsed.data])}
       block={parsed.data}
       courseId={courseId}
       lessonId={lessonId}

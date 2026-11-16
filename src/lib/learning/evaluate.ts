@@ -1,5 +1,6 @@
 import { generateJson, missingKey } from "@/lib/ai/gemini";
 import { HttpError } from "@/lib/supabase/server";
+import { MODEL_HISTORY_LIMIT } from "./attempt-history";
 import {
   activityDefinitions,
   feedbackSchema,
@@ -15,6 +16,7 @@ export type EvalContext = {
   objectives?: string[];
   response: string;
   previous: AttemptSummary[];
+  previousAttemptCount: number;
 };
 
 export type Evaluation = {
@@ -195,7 +197,7 @@ async function evaluateConversation(
   activity: Extract<LearningActivity, { activityType: "conversation" }>,
   ctx: EvalContext,
 ): Promise<Evaluation> {
-  const turn = ctx.previous.length + 1;
+  const turn = ctx.previousAttemptCount + 1;
   const finished = turn >= activity.config.minTurns;
   const generated = await generateJson({
     schema: feedbackSchema,
@@ -212,7 +214,7 @@ async function evaluateConversation(
       goals: activity.config.goals,
       rubric: activity.config.rubric,
       opening: activity.config.opening,
-      transcript: ctx.previous.slice(-8),
+      transcript: ctx.previous.slice(-MODEL_HISTORY_LIMIT),
       studentMessage: ctx.response,
       turn,
       minTurns: activity.config.minTurns,

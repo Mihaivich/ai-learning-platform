@@ -9,11 +9,11 @@ import { isPresentationDemo, lessonAsText } from "@/content/courses";
 import { ownedCourse, readLesson } from "@/lib/learning/repository";
 import { missingKey } from "@/lib/ai/gemini";
 import { evaluateActivity } from "@/lib/learning/evaluate";
+import { activityHistory } from "@/lib/learning/attempt-history";
 import { isDatabaseCourseId } from "@/lib/learning/ids";
 import { enforceQuota } from "@/lib/ai/quota";
 import {
   completionThreshold,
-  sameActivityContent,
   validateActivity,
 } from "@/lib/learning/registry";
 import type { LessonBlock } from "@/lib/types";
@@ -25,6 +25,7 @@ const requestSchema = z.object({
   response: z.string().trim().max(8000).optional(),
   action: z.enum(["submit", "complete"]),
   preview: z.boolean().default(false),
+  previewAttemptCount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER - 1).optional(),
   previewHistory: z
     .array(
       z.object({
@@ -118,12 +119,8 @@ export async function POST(req: Request) {
       const required = requiredActivities(found.lesson.blocks);
       if (
         required.some((block) => {
-          const matching = (attempts ?? []).filter(
-            (attempt) =>
-              attempt.activity_id === block.id &&
-              sameActivityContent(attempt.activity_snapshot, block),
-          );
-          return matching.length < completionThreshold(block);
+          const current = activityHistory(attempts ?? [], block, body.lessonId);
+          return current.previousAttemptCount < completionThreshold(block);
         })
       ) {
         throw new HttpError(
@@ -161,22 +158,17 @@ export async function POST(req: Request) {
     if (block.activityType !== "reading") {
       await enforceQuota(db, user.id, "feedback");
     }
-    const prior = history
-      .filter((attempt) => {
-        const id = "activity_id" in attempt ? attempt.activity_id : block.id;
-        return id === block.id;
-      })
-      .slice(-8)
-      .map((attempt) => ({
-        response: attempt.response,
-        feedback: attempt.feedback,
-      }));
+    const prior = activityHistory(history, block, body.lessonId, {
+      ephemeral: !persisted,
+      previewAttemptCount: body.previewAttemptCount,
+    });
     const evaluation = await evaluateActivity(block, {
       courseLanguage: found.course.language,
       lessonText: lessonAsText(found.lesson),
       objectives: found.lesson.objectives ?? found.course.objectives,
       response: body.response,
-      previous: prior,
+      previous: prior.previous,
+      previousAttemptCount: prior.previousAttemptCount,
     });
     const attempt = {
       id: crypto.randomUUID(),
