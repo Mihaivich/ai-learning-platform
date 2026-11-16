@@ -53,15 +53,21 @@ export function ProjectEditor({ projectId, initial }: { projectId: string; initi
   async function save() {
     setBusy(true);
     setResult(null);
-    const res = await fetch(`/api/teach/projects/${projectId}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(edits) });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setResult({ ok: false, text: data.error ?? "Could not save. Please try again.", problems: data.problems });
-      return;
+    try {
+      const res = await fetch(`/api/teach/projects/${projectId}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(edits) });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ ok: false, text: data.error ?? "Could not save. Please try again.", problems: data.problems });
+        return;
+      }
+      if (data.saved !== true) throw new Error("Save was not confirmed.");
+      setResult({ ok: true, text: "Saved. Students see the changes the next time they open the project." });
+      router.refresh();
+    } catch {
+      setResult({ ok: false, text: "Could not confirm the save. Your edits are still here. Please try again." });
+    } finally {
+      setBusy(false);
     }
-    setResult({ ok: true, text: "Saved. Students see the changes the next time they open the project." });
-    router.refresh();
   }
 
   return (
