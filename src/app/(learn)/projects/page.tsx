@@ -3,10 +3,11 @@ import Link from "next/link";
 import { Reveal } from "@/components/home/Reveal";
 import { SpotlightCard } from "@/components/home/SpotlightCard";
 import { glass } from "@/components/home/glass";
+import { ShareProjectToggle } from "@/components/projects/ShareProjectToggle";
 import { JoinClass } from "@/components/teach/JoinClass";
 import { studentClasses } from "@/lib/classes";
 import { projectListings, type ProjectListing } from "@/lib/projects/catalog";
-import { listOwnGeneratedProjects, type GeneratedListing } from "@/lib/projects/generated/store";
+import { listOwnGeneratedProjects, listPublicGeneratedProjects, type GeneratedListing } from "@/lib/projects/generated/store";
 import { serverDb } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Projects · DevPath" };
@@ -15,12 +16,31 @@ const openButton = "mt-7 inline-flex self-start rounded-full bg-white px-7 py-3 
 
 type Classes = Awaited<ReturnType<typeof studentClasses>>;
 
-async function ownProjects(): Promise<{ signedIn: boolean; projects: GeneratedListing[]; classes: Classes }> {
+async function loadProjects(): Promise<{
+  signedIn: boolean;
+  projects: GeneratedListing[];
+  community: GeneratedListing[];
+  classes: Classes;
+}> {
   const db = await serverDb();
-  const { data } = (await db?.auth.getUser()) ?? { data: { user: null } };
-  if (!db || !data.user) return { signedIn: false, projects: [], classes: [] };
-  const [projects, classes] = await Promise.all([listOwnGeneratedProjects(db), studentClasses(db, data.user.id)]);
-  return { signedIn: true, projects, classes };
+  if (!db) return { signedIn: false, projects: [], community: [], classes: [] };
+  const { data } = await db.auth.getUser();
+  if (!data.user) {
+    const community = await listPublicGeneratedProjects(db);
+    return { signedIn: false, projects: [], community, classes: [] };
+  }
+  const [projects, community, classes] = await Promise.all([
+    listOwnGeneratedProjects(db),
+    listPublicGeneratedProjects(db),
+    studentClasses(db, data.user.id),
+  ]);
+  const ownIds = new Set(projects.map((project) => project.id));
+  return {
+    signedIn: true,
+    projects,
+    community: community.filter((project) => !ownIds.has(project.id)),
+    classes,
+  };
 }
 
 /** A built-in project: what it's about, and the two ideas it teaches. */
@@ -45,7 +65,7 @@ function ProjectCard({ project }: { project: ProjectListing }) {
 }
 
 export default async function ProjectsPage() {
-  const { signedIn, projects, classes } = await ownProjects();
+  const { signedIn, projects, community, classes } = await loadProjects();
   return (
     <div className="mx-auto max-w-4xl px-4 pb-24 pt-12 text-white lg:px-0 lg:pt-16">
       <Reveal>
@@ -131,15 +151,40 @@ export default async function ProjectsPage() {
         <section className="mt-16">
           <Reveal>
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Your projects</h2>
-            <p className="mt-2 text-white/60">Only you can see these, unless you assign one to a class you teach.</p>
+            <p className="mt-2 text-white/60">Private by default. Assign one to a class you teach or share it with the community.</p>
           </Reveal>
           <div className="mt-6 grid gap-5 md:grid-cols-2">
             {projects.map((project) => (
               <SpotlightCard key={project.id} className="flex h-full flex-col p-7">
-                <p className="text-sm text-white/50">{project.domain}</p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="text-sm text-white/50">{project.subject ? `${project.subject} · ${project.domain}` : project.domain}</p>
+                  <ShareProjectToggle projectId={project.id} initialPublic={Boolean(project.is_public)} />
+                </div>
                 <h3 className="mt-2 text-xl font-semibold">{project.title}</h3>
                 <p className="mt-2 text-white/75">{project.tagline}</p>
                 <p className="mt-3 leading-relaxed text-white/60">{project.summary}</p>
+                <Link href={`/projects/${project.id}`} className={openButton}>
+                  Open the desktop
+                </Link>
+              </SpotlightCard>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {community.length > 0 && (
+        <section className="mt-16">
+          <Reveal>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Community projects</h2>
+            <p className="mt-2 text-white/60">Projects created and shared by learners and instructors across subjects.</p>
+          </Reveal>
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {community.map((project) => (
+              <SpotlightCard key={project.id} className="flex h-full flex-col p-7">
+                <p className="text-sm text-teal-200/80">{project.subject ? `${project.subject} · ${project.domain}` : project.domain}</p>
+                <h3 className="mt-2 text-xl font-semibold">{project.title}</h3>
+                <p className="mt-2 text-white/75">{project.tagline}</p>
+                <p className="mt-3 flex-1 leading-relaxed text-white/60">{project.summary}</p>
                 <Link href={`/projects/${project.id}`} className={openButton}>
                   Open the desktop
                 </Link>

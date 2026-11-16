@@ -22,7 +22,9 @@ export type GeneratedListing = {
   tagline: string;
   summary: string;
   domain: string;
+  subject?: string;
   topic: string;
+  is_public?: boolean;
   created_at: string;
 };
 
@@ -45,20 +47,45 @@ async function assignedToUser(id: string, userId: string) {
   return Boolean(data?.length);
 }
 
-/** The project's row for its owner, or for a student whose class it's assigned to. */
+/** The project's row for its owner, a class member, or anyone when shared publicly. */
 async function playableRow<T extends string>(id: string, userId: string, columns: T) {
   if (!isGeneratedId(id)) return null;
-  const { data, error } = await recordDb().from("generated_projects").select(`owner_id,${columns}`).eq("id", id).maybeSingle();
-  if (error) throw new HttpError(503, "Could not load this project. Please retry.");
-  if (!data) return null;
-  const row = data as unknown as Record<string, unknown> & { owner_id: string };
-  return row.owner_id === userId || (await assignedToUser(id, userId)) ? row : null;
+  const db = recordDb();
+  let res = await db.from("generated_projects").select(`owner_id,is_public,${columns}`).eq("id", id).maybeSingle();
+  if (res.error?.code === "42703") {
+    res = await db.from("generated_projects").select(`owner_id,${columns}`).eq("id", id).maybeSingle();
+  }
+  if (res.error) throw new HttpError(503, "Could not load this project. Please retry.");
+  if (!res.data) return null;
+  const row = res.data as unknown as Record<string, unknown> & { owner_id: string; is_public?: boolean };
+  return row.owner_id === userId || row.is_public === true || (await assignedToUser(id, userId)) ? row : null;
 }
 
 /** What the desktop shows before the run loads. */
 export async function loadPlayableListing(id: string, userId: string) {
   const row = await playableRow(id, userId, "title,summary,path_id");
-  return row ? { title: row.title as string, summary: row.summary as string, pathId: (row.path_id as string | null) ?? null, own: row.owner_id === userId } : null;
+  return row
+    ? {
+        title: row.title as string,
+        summary: row.summary as string,
+        pathId: (row.path_id as string | null) ?? null,
+        own: row.owner_id === userId,
+        isPublic: row.is_public === true,
+      }
+    : null;
+}
+
+/** Public-only listing summary for signed-out visitors opening a community project. */
+export async function loadPublicListing(id: string) {
+  if (!isGeneratedId(id)) return null;
+  const { data, error } = await recordDb()
+    .from("generated_projects")
+    .select("title,summary,is_public")
+    .eq("id", id)
+    .eq("is_public", true)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { title: data.title as string, summary: data.summary as string };
 }
 
 /** The owner's draft, to edit or to build on. */
@@ -97,7 +124,7 @@ export async function saveGeneratedProject(
   project: GeneratedProject,
   path?: { id: string; step: number },
 ) {
-  const { error } = await recordDb().from("generated_projects").insert({
+  const baseRow = {
     id: project.scenario.id,
     owner_id: ownerId,
     domain: (request.domain.trim() || project.draft.domain).slice(0, 80),
@@ -109,19 +136,63 @@ export async function saveGeneratedProject(
     template_version: TEMPLATE_VERSION,
     model: project.model,
     ...(path ? { path_id: path.id, path_step: path.step } : {}),
+  };
+  let { error } = await recordDb().from("generated_projects").insert({
+    ...baseRow,
+    subject: (request.subject?.trim() || "").slice(0, 120),
   });
+  if (error?.code === "42703") {
+    ({ error } = await recordDb().from("generated_projects").insert(baseRow));
+  }
   // 23505: another request already made this step's project.
   if (error?.code === "23505" && path) throw new HttpError(409, "This step already has a project. Reload the page.");
   if (error) throw new HttpError(503, "The project was written but could not be saved. Please retry.");
+}
+
+/** Toggles whether an owner's generated project appears in the community gallery (RLS-enforced). */
+export async function setGeneratedProjectVisibility(
+  db: SupabaseClient,
+  id: string,
+  ownerId: string,
+  isPublic: boolean,
+) {
+  if (!isGeneratedId(id)) throw new HttpError(404, "Project not found.");
+  const { data, error } = await db
+    .from("generated_projects")
+    .update({ is_public: isPublic })
+    .eq("id", id)
+    .eq("owner_id", ownerId)
+    .select("id,is_public");
+  if (error?.code === "42703") {
+    throw new HttpError(503, "Community sharing requires the latest database migration.");
+  }
+  if (error) throw new HttpError(503, "Could not update sharing setting. Please retry.");
+  if (!data?.length) throw new HttpError(404, "Project not found.");
+  return { id, isPublic: Boolean(data[0].is_public) };
 }
 
 /** The signed-in user's own projects, newest first, through their row-level-secured client. */
 export async function listOwnGeneratedProjects(db: SupabaseClient): Promise<GeneratedListing[]> {
   const { data, error } = await db
     .from("generated_projects")
-    .select("id,title,tagline,summary,domain,topic,created_at")
+    .select("id,title,tagline,summary,domain,subject,topic,is_public,created_at")
     .order("created_at", { ascending: false })
     .limit(50);
+  if (error?.code === "42703") {
+    const fallback = await db
+      .from("generated_projects")
+      .select("id,title,tagline,summary,domain,topic,created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    return (fallback.data ?? []) as GeneratedListing[];
+  }
   if (error) return [];
-  return data as GeneratedListing[];
+  return (data ?? []) as GeneratedListing[];
+}
+
+/** Community-shared projects returned via security-definer RPC without owner_id. */
+export async function listPublicGeneratedProjects(db: SupabaseClient, limit = 24): Promise<GeneratedListing[]> {
+  const { data, error } = await db.rpc("list_public_projects", { p_limit: limit });
+  if (error) return [];
+  return (data ?? []) as GeneratedListing[];
 }
