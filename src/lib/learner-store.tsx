@@ -1,23 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
-import { isDatabaseCourseId } from "@/lib/learning/ids";
+import { LearnerProgressSync, type ProgressMap, type ProgressSnapshot, type ProgressSyncStatus } from "./learner-sync";
 import type { BlockResult, LearnerProfile } from "@/lib/types";
-
-/**
- * Learner state lives in localStorage so the demo works without an account.
- * When Supabase is configured and the user is signed in, every change is also
- * written to the database, and the database copy wins on load.
- */
-
-interface LessonProgress {
-  completedAt?: string;
-  blocks: Record<string, BlockResult>;
-}
-
-type ProgressMap = Record<string, LessonProgress>; // key: `${courseId}/${lessonId}`
 
 interface LearnerState {
   ready: boolean;
@@ -25,6 +12,8 @@ interface LearnerState {
   profile: LearnerProfile | null;
   saveProfile: (profile: LearnerProfile) => Promise<void>;
   progress: ProgressMap;
+  syncStatus: ProgressSyncStatus;
+  retrySync: () => Promise<void>;
   recordBlock: (courseId: string, lessonId: string, blockId: string, result: BlockResult) => void;
   completeLesson: (courseId: string, lessonId: string) => void;
   noteServerLessonComplete: (courseId: string, lessonId: string) => void;
@@ -33,227 +22,184 @@ interface LearnerState {
 }
 
 const PROFILE_KEY = "learner-profile";
-const PROGRESS_KEY = "learner-progress";
-
 const LearnerContext = createContext<LearnerState | null>(null);
+const browserStorage = {
+  getItem: (key: string) => window.localStorage.getItem(key),
+  setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
+};
+const emptySnapshot: ProgressSnapshot = {
+  progress: {},
+  status: { pending: 0, syncing: false, error: "", localSaved: true },
+};
 
-function readLocal<T>(key: string): T | null {
+function readProfile(key: string): LearnerProfile | null {
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+    const raw = browserStorage.getItem(key);
+    return raw ? JSON.parse(raw) as LearnerProfile : null;
   } catch {
     return null;
   }
 }
 
-function writeLocal(key: string, value: unknown) {
+function writeProfile(key: string, value: LearnerProfile) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    browserStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Storage can be unavailable (private mode); the in-memory state still works.
+    // The current profile remains available in memory.
   }
 }
 
 export function LearnerProvider({ children }: { children: React.ReactNode }) {
-  const activeUserId = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
-  const [progress, setProgress] = useState<ProgressMap>({});
+  const [sync, setSync] = useState<LearnerProgressSync | null>(null);
+  const [snapshot, setSnapshot] = useState(emptySnapshot);
 
   useEffect(() => {
-    setProfile(readLocal<LearnerProfile>(PROFILE_KEY));
-    setProgress(readLocal<ProgressMap>(PROGRESS_KEY) ?? {});
+    const db = getSupabase();
+    let active = true;
+    let epoch = 0;
+    let authVersion = 0;
+    let currentId: string | null | undefined;
+    let currentSync: LearnerProgressSync | null = null;
 
-    const supabase = getSupabase();
-    if (!supabase) {
-      setReady(true);
-      return;
+    function beginSession(nextUser: User | null) {
+      if (!active) return;
+      const id = nextUser?.id ?? null;
+      if (currentId === id) {
+        setUser(nextUser);
+        return;
+      }
+      currentId = id;
+      const sessionEpoch = ++epoch;
+      currentSync?.dispose();
+      setReady(false);
+      setUser(nextUser);
+      setProfile(readProfile(id ? `${PROFILE_KEY}:${id}` : PROFILE_KEY));
+      const nextSync = new LearnerProgressSync({
+        db: id ? db : null,
+        userId: id,
+        storage: browserStorage,
+        onChange: setSnapshot,
+      });
+      currentSync = nextSync;
+      setSync(nextSync);
+      setSnapshot(nextSync.snapshot);
+      if (!id || !db) {
+        setReady(true);
+        return;
+      }
+
+      // Return from Supabase auth callbacks before starting database queries.
+      setTimeout(() => {
+        if (!active || epoch !== sessionEpoch) return;
+        const loadProfile = async () => {
+          try {
+            const { data: row } = await db!.from("profiles").select("*").eq("id", id).maybeSingle();
+            if (!active || epoch !== sessionEpoch || !row?.background) return;
+            const remote: LearnerProfile = {
+              displayName: row.display_name ?? "",
+              background: row.background,
+              experience: row.experience,
+              goal: row.goal,
+              language: row.language ?? "en",
+            };
+            setProfile(remote);
+            writeProfile(`${PROFILE_KEY}:${id}`, remote);
+          } catch {
+            // Keep this account's cached profile while offline.
+          }
+        };
+        void Promise.all([nextSync.initialize(), loadProfile()]).then(() => {
+          if (active && epoch === sessionEpoch) setReady(true);
+        });
+      }, 0);
     }
 
-    let authEpoch = 0;
-    const initialEpoch = authEpoch;
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (authEpoch !== initialEpoch) return;
-      activeUserId.current = data.user?.id ?? null;
-      setUser(data.user);
-      if (data.user) { setProfile(null); setProgress({}); }
-      if (data.user) await loadRemote(data.user.id);
-      setReady(true);
+    if (!db) {
+      beginSession(null);
+      return () => { active = false; currentSync?.dispose(); };
+    }
+    const initialVersion = authVersion;
+    void db.auth.getUser().then(({ data }) => {
+      if (authVersion === initialVersion) beginSession(data.user);
+    }).catch(() => {
+      if (authVersion === initialVersion) beginSession(null);
     });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      authEpoch++;
-      const changed = activeUserId.current !== (session?.user.id ?? null);
-      activeUserId.current = session?.user.id ?? null;
-      setUser(session?.user ?? null);
-      setReady(true);
-      if (!changed) return;
-      if (session?.user) {
-        setProfile(null); setProgress({});
-        setTimeout(() => { void loadRemote(session.user.id); }, 0);
-      } else { setProfile(readLocal<LearnerProfile>(PROFILE_KEY)); setProgress(readLocal<ProgressMap>(PROGRESS_KEY) ?? {}); }
+    const { data: subscription } = db.auth.onAuthStateChange((_event, session) => {
+      authVersion++;
+      beginSession(session?.user ?? null);
     });
-    return () => { authEpoch++; activeUserId.current = null; sub.subscription.unsubscribe(); };
+    return () => {
+      active = false;
+      epoch++;
+      currentSync?.dispose();
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
-  async function loadRemote(userId: string) {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    const { data: row } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-    if (activeUserId.current !== userId) return;
-    if (row?.background) {
-      const remote: LearnerProfile = {
-        displayName: row.display_name ?? "",
-        background: row.background,
-        experience: row.experience,
-        goal: row.goal,
-        language: row.language ?? "en",
-      };
-      setProfile(remote);
-      writeLocal(`${PROFILE_KEY}:${userId}`, remote);
-    }
-
-    const { data: rows } = await supabase.from("lesson_progress").select("*").eq("user_id", userId);
-    if (activeUserId.current !== userId) return;
-    if (rows) {
-      const remote: ProgressMap = {};
-      for (const r of rows) {
-        remote[`${r.course_id}/${r.lesson_id}`] = {
-          completedAt: r.completed_at ?? undefined,
-          blocks: r.block_results ?? {},
-        };
-      }
-      setProgress(() => {
-        writeLocal(`${PROGRESS_KEY}:${userId}`, remote);
-        return remote;
-      });
-    }
-  }
-
-  const saveProfile = useCallback(
-    async (next: LearnerProfile) => {
-      setProfile(next);
-      writeLocal(user ? `${PROFILE_KEY}:${user.id}` : PROFILE_KEY, next);
-      const supabase = getSupabase();
-      if (supabase && user) {
-        await supabase.from("profiles").upsert({
-          id: user.id,
-          display_name: next.displayName,
-          background: next.background,
-          experience: next.experience,
-          goal: next.goal,
-          language: next.language,
-          updated_at: new Date().toISOString(),
-        });
-      }
-    },
-    [user],
-  );
-
-  const syncLesson = useCallback(
-    (courseId: string, lessonId: string, lesson: LessonProgress) => {
-      const supabase = getSupabase();
-      if (!supabase || !user || isDatabaseCourseId(courseId)) return;
-      void supabase.from("lesson_progress").upsert({
-        user_id: user.id,
-        course_id: courseId,
-        lesson_id: lessonId,
-        completed_at: lesson.completedAt ?? null,
-        block_results: lesson.blocks,
+  const saveProfile = useCallback(async (next: LearnerProfile) => {
+    setProfile(next);
+    writeProfile(user ? `${PROFILE_KEY}:${user.id}` : PROFILE_KEY, next);
+    const db = getSupabase();
+    if (db && user) {
+      await db.from("profiles").upsert({
+        id: user.id,
+        display_name: next.displayName,
+        background: next.background,
+        experience: next.experience,
+        goal: next.goal,
+        language: next.language,
         updated_at: new Date().toISOString(),
       });
-    },
-    [user],
-  );
+    }
+  }, [user]);
 
-  const logEvent = useCallback(
-    (courseId: string, lessonId: string | null, eventType: string, payload: object = {}) => {
-      const supabase = getSupabase();
-      if (!supabase || !user) return;
-      void supabase.from("activity_events").insert({
-        user_id: user.id,
-        course_id: courseId,
-        lesson_id: lessonId,
-        event_type: eventType,
-        payload,
-      });
-    },
-    [user],
-  );
+  const logEvent = useCallback((courseId: string, lessonId: string | null, eventType: string, payload: object = {}) => {
+    if (ready) void sync?.logEvent(courseId, lessonId, eventType, payload);
+  }, [sync, ready]);
 
-  const updateLesson = useCallback(
-    (courseId: string, lessonId: string, update: (prev: LessonProgress) => LessonProgress) => {
-      setProgress((prev) => {
-        const key = `${courseId}/${lessonId}`;
-        const lesson = update(prev[key] ?? { blocks: {} });
-        const next = { ...prev, [key]: lesson };
-        writeLocal(user ? `${PROGRESS_KEY}:${user.id}` : PROGRESS_KEY, next);
-        syncLesson(courseId, lessonId, lesson);
-        return next;
-      });
-    },
-    [syncLesson, user],
-  );
+  const recordBlock = useCallback((courseId: string, lessonId: string, blockId: string, result: BlockResult) => {
+    if (!ready) return;
+    sync?.update(courseId, lessonId, previous => ({
+      ...previous, blocks: { ...previous.blocks, [blockId]: result },
+    }));
+    logEvent(courseId, lessonId, "block_completed", { blockId, ...result });
+  }, [sync, ready, logEvent]);
 
-  const recordBlock = useCallback(
-    (courseId: string, lessonId: string, blockId: string, result: BlockResult) => {
-      updateLesson(courseId, lessonId, (prev) => ({
-        ...prev,
-        blocks: { ...prev.blocks, [blockId]: result },
-      }));
-      logEvent(courseId, lessonId, "block_completed", { blockId, ...result });
-    },
-    [updateLesson, logEvent],
-  );
+  const noteServerLessonComplete = useCallback((courseId: string, lessonId: string) => {
+    if (!ready) return;
+    sync?.update(courseId, lessonId, previous => ({
+      ...previous, completedAt: previous.completedAt ?? new Date().toISOString(),
+    }));
+  }, [sync, ready]);
 
-  const completeLesson = useCallback(
-    (courseId: string, lessonId: string) => {
-      updateLesson(courseId, lessonId, (prev) => ({
-        ...prev,
-        completedAt: prev.completedAt ?? new Date().toISOString(),
-      }));
-      logEvent(courseId, lessonId, "lesson_completed");
-    },
-    [updateLesson, logEvent],
-  );
+  const completeLesson = useCallback((courseId: string, lessonId: string) => {
+    noteServerLessonComplete(courseId, lessonId);
+    logEvent(courseId, lessonId, "lesson_completed");
+  }, [noteServerLessonComplete, logEvent]);
 
-  const noteServerLessonComplete = useCallback(
-    (courseId: string, lessonId: string) => {
-      setProgress((prev) => {
-        const key = `${courseId}/${lessonId}`;
-        const current = prev[key] ?? { blocks: {} };
-        const next = {
-          ...prev,
-          [key]: {
-            ...current,
-            completedAt: current.completedAt ?? new Date().toISOString(),
-          },
-        };
-        writeLocal(user ? `${PROGRESS_KEY}:${user.id}` : PROGRESS_KEY, next);
-        return next;
-      });
-    },
-    [user],
-  );
-
+  const retrySync = useCallback(async () => { await sync?.retry(); }, [sync]);
   const signOut = useCallback(async () => {
-    activeUserId.current = null;
-    await getSupabase()?.auth.signOut();
-    setUser(null); setProfile(null); setProgress({});
+    // Auth state change owns cleanup; failed sign-out keeps the session usable.
+    const db = getSupabase();
+    if (!db) return;
+    const { error } = await db.auth.signOut();
+    if (error) throw error;
   }, []);
 
-  const value = useMemo<LearnerState>(
-    () => ({ ready, user, profile, saveProfile, progress, recordBlock, completeLesson, noteServerLessonComplete, logEvent, signOut }),
-    [ready, user, profile, saveProfile, progress, recordBlock, completeLesson, noteServerLessonComplete, logEvent, signOut],
-  );
+  const value = useMemo<LearnerState>(() => ({
+    ready, user, profile, saveProfile, progress: snapshot.progress,
+    syncStatus: snapshot.status, retrySync, recordBlock, completeLesson,
+    noteServerLessonComplete, logEvent, signOut,
+  }), [ready, user, profile, saveProfile, snapshot, retrySync, recordBlock, completeLesson, noteServerLessonComplete, logEvent, signOut]);
 
   return <LearnerContext.Provider value={value}>{children}</LearnerContext.Provider>;
 }
 
 export function useLearner() {
-  const ctx = useContext(LearnerContext);
-  if (!ctx) throw new Error("useLearner must be used inside LearnerProvider");
-  return ctx;
+  const context = useContext(LearnerContext);
+  if (!context) throw new Error("useLearner must be used inside LearnerProvider");
+  return context;
 }

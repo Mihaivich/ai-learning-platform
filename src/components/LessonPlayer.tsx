@@ -13,13 +13,14 @@ import { RoleplayBlockView } from "@/components/blocks/RoleplayBlockView";
 import { buttonPrimary } from "@/components/blocks/BlockCard";
 import { isDatabaseCourseId } from "@/lib/learning/ids";
 import { useLearner } from "@/lib/learner-store";
+import { ProgressSyncStatus } from "@/components/ProgressSyncStatus";
 import type { BlockResult, Course, Lesson, LessonBlock } from "@/lib/types";
 
 export function LessonPlayer({ course, lesson, preview = false }: { course: Course; lesson: Lesson; preview?: boolean }) {
   const [previewResults, setPreviewResults] = useState<Record<string, BlockResult>>({});
   const [completionError, setCompletionError] = useState("");
   const [completing, setCompleting] = useState(false);
-  const { progress, recordBlock, completeLesson, noteServerLessonComplete } = useLearner();
+  const { ready, progress, recordBlock, completeLesson, noteServerLessonComplete } = useLearner();
   const [tutorOpen, setTutorOpen] = useState(false);
   const lessonProgress = progress[`${course.id}/${lesson.id}`];
   const results = preview ? previewResults : lessonProgress?.blocks ?? {};
@@ -31,6 +32,8 @@ export function LessonPlayer({ course, lesson, preview = false }: { course: Cour
 
   const index = course.lessons.findIndex((l) => l.id === lesson.id);
   const next = course.lessons[index + 1];
+
+  if (!ready) return <p role="status" className="p-8">Loading your learning progress…</p>;
 
   function render(block: LessonBlock) {
     const common = {
@@ -70,6 +73,7 @@ export function LessonPlayer({ course, lesson, preview = false }: { course: Cour
           <span>Lesson {index + 1}</span>
         </nav>
         <h1 className="mt-2 text-3xl font-bold text-stone-900">{lesson.title}</h1>
+        {!preview && <ProgressSyncStatus />}
         <div className="mt-3 flex items-center gap-3">
           <div className="h-1.5 w-40 overflow-hidden rounded-full bg-stone-200">
             <div

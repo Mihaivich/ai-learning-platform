@@ -58,6 +58,46 @@ update public.profiles set role = 'instructor' where id = '<user-uuid>';
 
 AI features (tutor, role-play, prompt lab, course builder and activity feedback) require that sign-in. Without the service role key, lesson completion and saved attempts are not recorded.
 
+### Progress storage and recovery
+
+Static demonstration courses save progress in the browser. Signed-in learners
+also sync that progress to Supabase. Pending static lesson snapshots are kept
+in the same account-specific cache entry as the progress, so refreshing after
+a failed upload retains the work. The lesson player shows a retry action when
+syncing fails. If browser storage is unavailable, it reports that unsynced work
+is only held in the current page's memory.
+
+Existing account caches are recovered conservatively: remote results win
+conflicting legacy activity fields, while missing local activities and completion
+are retained. Anonymous work is kept separate from signed-in accounts. Dynamic
+UUID courses still require server-verified attempts and completion; the browser
+sync queue cannot create that evidence. Events are sent on a best-effort basis
+and are not replayed from historical progress. Simultaneous edits from multiple
+devices are not resolved by this browser-local queue.
+
+### Verification
+
+Use Node.js 22 or later, matching the locked Supabase dependency requirements.
+
+```bash
+npm ci
+npx playwright install chromium
+npm run typecheck
+npm run lint
+npm test
+npm run test:e2e:progress
+npm run build
+npm run test:e2e
+```
+
+`test:e2e:progress` starts an isolated development server with placeholder
+Supabase settings. It exercises the real learner provider and SDK, intercepting
+Auth and database HTTP in Playwright; no live account or database is required.
+The unit tests likewise use the real SDK with a fetch stub, checking that writes
+actually execute. Run the progress browser suite before the production build,
+as both Next.js servers use `.next`. Live Supabase smoke testing remains a
+separate staging check.
+
 ### Deploy to Vercel
 
 Import the GitHub repo in Vercel and add the same environment variables in Project Settings → Environment Variables.

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:postgres": "bash scripts/verify-review-fixes.sh",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:progress": "playwright test --config playwright.progress.config.ts"
   },
   "dependencies": {
     "@google/genai": "^2.30.0",
