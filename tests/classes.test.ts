@@ -26,7 +26,7 @@ test("a run shows the instructor where the student is, and which ideas they sett
 
   let state = startProject(scenario);
   // Opened but not played yet.
-  assert.deepEqual(summariseRun(scenario, { state, status: "active", outcome: null, updated_at: "2026-11-02T10:00:00Z" }), { status: "not-started" });
+  assert.deepEqual(summariseRun(scenario, { activity_snapshot: { project: scenario.id, version: scenario.version }, state, status: "active", outcome: null, updated_at: "2026-11-02T10:00:00Z" }), { status: "not-started" });
   state = chooseAction(scenario, state, "pick-engineering").state;
   state = chooseAction(scenario, state, "call-grace").state;
   for (const fact of Object.values(tidewaterSwimDraft.facts)) state = (await askClient(scenario, state, fact.sampleQuestion, offlineEvaluator)).state;
@@ -35,7 +35,7 @@ test("a run shows the instructor where the student is, and which ideas they sett
   // The brief covers the key but not the old tests, so Cody rewrites the pricing.
   state = (await submitBrief(scenario, state, `${tidewaterSwimDraft.constraints.rule.label}. ${tidewaterSwimDraft.constraints.scope.label}.`, offlineEvaluator)).state;
 
-  const run = summariseRun(scenario, { state, status: "active", outcome: null, updated_at: "2026-11-02T10:00:00Z" });
+  const run = summariseRun(scenario, { activity_snapshot: { project: scenario.id, version: scenario.version }, state, status: "active", outcome: null, updated_at: "2026-11-02T10:00:00Z" });
   assert.ok(run.status === "active");
   assert.equal(run.stage, "Review Cody's work");
   assert.equal(run.track, "engineering");

@@ -1,3 +1,4 @@
+import { matchesProjectVersion } from "@/lib/projects/version";
 import { randomInt } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SimulationState } from "@/lib/learning/simulation/engine";
@@ -125,10 +126,10 @@ export type RunSummary =
 
 export function summariseRun(
   scenario: ProjectScenario,
-  row: { state: SimulationState; status: string; outcome: string | null; updated_at: string } | null,
+  row: { activity_snapshot: unknown; state: SimulationState; status: string; outcome: string | null; updated_at: string } | null,
 ): RunSummary {
   // Opening the desktop saves a run; it counts once the student has done something.
-  if (!row || (row.status !== "completed" && row.state.step === 0)) return { status: "not-started" };
+  if (!row || !matchesProjectVersion(row.activity_snapshot, scenario) || (row.status !== "completed" && row.state.step === 0)) return { status: "not-started" };
   const state = row.state;
   const stage = scenario.config.stages.find((item) => item.id === state.stageId);
   const completed = row.status === "completed";
@@ -168,7 +169,7 @@ export async function classProgress(
     projectIds.length
       ? service
           .from("simulation_sessions")
-          .select("user_id,activity_id,state,status,outcome,updated_at")
+          .select("user_id,activity_id,activity_snapshot,state,status,outcome,updated_at")
           .in("user_id", ids)
           .in("course_id", projectIds.map((id) => `project:${id}`))
       : Promise.resolve({ data: [], error: null }),
@@ -185,7 +186,7 @@ export async function classProgress(
       const scenario = scenarios.get(projectId);
       if (!scenario) continue;
       const row = (sessions ?? []).find((item) => item.user_id === member.student_id && item.activity_id === projectId);
-      runs[projectId] = summariseRun(scenario, row ? (row as { state: SimulationState; status: string; outcome: string | null; updated_at: string }) : null);
+      runs[projectId] = summariseRun(scenario, row ? (row as { activity_snapshot: unknown; state: SimulationState; status: string; outcome: string | null; updated_at: string }) : null);
     }
     return { id: member.student_id, name, email, joinedAt: member.joined_at, runs };
   });
