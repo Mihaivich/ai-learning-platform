@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SimulationState } from "@/lib/learning/simulation/engine";
 import { projectListings } from "@/lib/projects/catalog";
 import { getProjectScenario } from "@/lib/projects";
-import { isGeneratedId, listOwnGeneratedProjects, loadGeneratedScenario } from "@/lib/projects/generated/store";
+import { isGeneratedId, loadGeneratedScenario } from "@/lib/projects/generated/store";
 import { conceptResults, trackOf, type ConceptResult } from "@/lib/projects/runtime";
 import type { ProjectScenario, Track } from "@/lib/projects/types";
 import { HttpError, recordDb, redactSecrets } from "@/lib/supabase/server";
@@ -34,8 +34,21 @@ export function isAssignable(id: string) {
 
 /** What this instructor can assign: the built-in projects, then the ones they made. */
 export async function assignableFor(db: SupabaseClient) {
-  const own = await listOwnGeneratedProjects(db);
-  return [...ASSIGNABLE, ...own.map(({ id, title }) => ({ id, title }))];
+  const own: { id: string; title: string }[] = [];
+  const pageSize = 500;
+  // This picker must include older projects too. RLS restricts rows to the
+  // instructor's own projects; a failed page must not look like an empty list.
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await db.from("generated_projects")
+      .select("id,title")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(offset, offset + pageSize - 1);
+    if (error || !data) throw new HttpError(503, "Could not load the assignable projects. Please retry.");
+    own.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return [...ASSIGNABLE, ...own];
 }
 
 export type ClassRow = { id: string; name: string; join_code: string; created_at: string };
@@ -85,9 +98,23 @@ export async function loadOwnClass(db: SupabaseClient, ownerId: string, classId:
   };
 }
 
-/** Replaces the class's assigned projects with those of `projectIds` the instructor may assign. */
-export async function assignProjects(db: SupabaseClient, classId: string, projectIds: string[], allowed: string[]) {
-  const wanted = [...new Set(projectIds)].filter((id) => allowed.includes(id));
+/** Validates the entire requested selection before changing any assignments. */
+export async function assignProjects(db: SupabaseClient, classId: string, projectIds: string[], ownerId: string) {
+  const wanted = [...new Set(projectIds)];
+  if (wanted.some((id) => !isAssignable(id) && !isGeneratedId(id))) {
+    throw new HttpError(400, "One or more projects cannot be assigned. Reload and try again.");
+  }
+  const generated = wanted.filter(isGeneratedId);
+  if (generated.length) {
+    // Authorize the requested IDs, independently of any paginated UI listing.
+    const { data, error } = await db.from("generated_projects").select("id")
+      .eq("owner_id", ownerId).in("id", generated);
+    if (error || !data) throw new HttpError(503, "Could not check the projects. Please retry.");
+    const owned = new Set(data.map((row) => row.id));
+    if (generated.some((id) => !owned.has(id))) {
+      throw new HttpError(400, "One or more projects cannot be assigned. Reload and try again.");
+    }
+  }
   const { data: current, error } = await db.from("class_projects").select("project_id").eq("class_id", classId);
   if (error) throw new HttpError(503, "Could not update the projects. Please retry.");
   const have = (current ?? []).map((row) => row.project_id as string);
