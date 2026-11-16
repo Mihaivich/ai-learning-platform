@@ -1,3 +1,5 @@
+import { matchesProjectVersion } from "../version";
+import { TEMPLATE_VERSION } from "./build";
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -172,28 +174,32 @@ export type PathProgress = {
  */
 export function stepStatuses(
   steps: number,
-  projects: { path_step: number; id: string }[],
-  sessions: { course_id: string; status: string; outcome: string | null }[],
+  projects: { path_step: number; id: string; content_revision: number }[],
+  sessions: { course_id: string; status: string; outcome: string | null; activity_snapshot: unknown }[],
 ): PathProgress {
   const result: PathProgress = [];
   for (let step = 1; step <= steps; step++) {
-    const projectId = projects.find((project) => project.path_step === step)?.id ?? null;
+    const project = projects.find((project) => project.path_step === step);
+    const projectId = project?.id ?? null;
     const session = projectId ? sessions.find((item) => item.course_id === `project:${projectId}`) : undefined;
+    const current = session && project && matchesProjectVersion(session.activity_snapshot, { id: project.id, version: TEMPLATE_VERSION, contentRevision: project.content_revision }) ? session : undefined;
     const previousDone = step === 1 || result[step - 2].status === "done";
-    const status: StepStatus = session?.status === "completed" ? "done" : projectId ? "playing" : previousDone ? "ready" : "locked";
-    result.push({ step, projectId, status, outcome: session?.status === "completed" ? session.outcome : null });
+    const status: StepStatus = !previousDone ? "locked" : current?.status === "completed" ? "done" : projectId ? "playing" : "ready";
+    result.push({ step, projectId, status, outcome: status === "done" ? current!.outcome : null });
   }
   return result;
 }
 
 /** Progress through a path, read through the owner's row-level-secured client. */
 export async function pathProgress(db: SupabaseClient, pathId: string, steps: number): Promise<PathProgress> {
-  const { data: projects } = await db.from("generated_projects").select("id,path_step").eq("path_id", pathId);
+  const { data: projects, error: projectError } = await db.from("generated_projects").select("id,path_step,content_revision").eq("path_id", pathId);
+  if (projectError) throw new HttpError(503, "Could not load path progress. Please retry.");
   const ids = (projects ?? []).map((project) => `project:${project.id}`);
-  const { data: sessions } = ids.length
-    ? await db.from("simulation_sessions").select("course_id,status,outcome").in("course_id", ids)
-    : { data: [] };
-  return stepStatuses(steps, (projects ?? []) as { path_step: number; id: string }[], (sessions ?? []) as { course_id: string; status: string; outcome: string | null }[]);
+  const { data: sessions, error: sessionError } = ids.length
+    ? await db.from("simulation_sessions").select("course_id,status,outcome,activity_snapshot").in("course_id", ids)
+    : { data: [], error: null };
+  if (sessionError) throw new HttpError(503, "Could not load path progress. Please retry.");
+  return stepStatuses(steps, (projects ?? []) as { path_step: number; id: string; content_revision: number }[], (sessions ?? []) as { course_id: string; status: string; outcome: string | null; activity_snapshot: unknown }[]);
 }
 
 export type PathListing = { id: string; subject: string; domain: string; title: string; summary: string; created_at: string };

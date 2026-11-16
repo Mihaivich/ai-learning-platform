@@ -110,6 +110,8 @@ export type ProjectConcept = {
 export type FollowUp = { subject: string; body: string };
 
 export type ProjectScenario = {
+  /** Revision of an instructor-editable generated draft, independent of its template. */
+  contentRevision?: number;
   id: string;
   /** Bump when content changes; running sessions created on another version restart. */
   version: number;

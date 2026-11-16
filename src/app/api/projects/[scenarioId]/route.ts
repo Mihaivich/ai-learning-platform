@@ -1,3 +1,4 @@
+import { matchesProjectVersion, projectSnapshot } from "@/lib/projects/version";
 import { z } from "zod";
 import { HttpError, recordDb, redactSecrets, requireAccount } from "@/lib/supabase/server";
 import { simulationApiError } from "@/lib/learning/simulation/http";
@@ -63,12 +64,11 @@ function courseKey(scenario: ProjectScenario) {
 }
 
 function snapshot(scenario: ProjectScenario) {
-  return { project: scenario.id, version: scenario.version };
+  return projectSnapshot(scenario);
 }
 
 function sameVersion(session: SessionRow, scenario: ProjectScenario) {
-  const value = session.activity_snapshot as { project?: unknown; version?: unknown } | null;
-  return value?.project === scenario.id && value?.version === scenario.version;
+  return matchesProjectVersion(session.activity_snapshot, scenario);
 }
 
 async function scenarioFrom(params: Promise<{ scenarioId: string }>, userId: string) {

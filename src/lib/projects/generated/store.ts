@@ -84,11 +84,11 @@ export async function updateOwnDraft(id: string, ownerId: string, draft: Project
 
 /** The playable scenario, or null when it doesn't exist or this user may not play it. */
 export async function loadGeneratedScenario(id: string, userId: string): Promise<ProjectScenario | null> {
-  const data = await playableRow(id, userId, "draft");
+  const data = await playableRow(id, userId, "draft,content_revision");
   if (!data) return null;
   const draft = projectDraftSchema.safeParse(data.draft);
   if (!draft.success) throw new HttpError(500, "This project can't be opened any more.");
-  return buildScenario(draft.data, { id, version: TEMPLATE_VERSION });
+  return { ...buildScenario(draft.data, { id, version: TEMPLATE_VERSION }), contentRevision: Number(data.content_revision ?? 1) };
 }
 
 export async function saveGeneratedProject(

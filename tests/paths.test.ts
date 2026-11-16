@@ -52,11 +52,11 @@ test("a plan that fails its checks goes back to the model once", async () => {
 test("a step opens when the one before is finished, whatever the outcome", () => {
   assert.deepEqual(stepStatuses(3, [], []).map((step) => step.status), ["ready", "locked", "locked"]);
 
-  const projects = [{ path_step: 1, id: "gen-aaaaaaaaaaaa" }];
-  const playing = stepStatuses(3, projects, [{ course_id: "project:gen-aaaaaaaaaaaa", status: "active", outcome: null }]);
+  const projects = [{ path_step: 1, id: "gen-aaaaaaaaaaaa", content_revision: 1 }];
+  const playing = stepStatuses(3, projects, [{ course_id: "project:gen-aaaaaaaaaaaa", activity_snapshot: { project: "gen-aaaaaaaaaaaa", version: 1 }, status: "active", outcome: null }]);
   assert.deepEqual(playing.map((step) => step.status), ["playing", "locked", "locked"]);
 
-  const failed = stepStatuses(3, projects, [{ course_id: "project:gen-aaaaaaaaaaaa", status: "completed", outcome: "failure" }]);
+  const failed = stepStatuses(3, projects, [{ course_id: "project:gen-aaaaaaaaaaaa", activity_snapshot: { project: "gen-aaaaaaaaaaaa", version: 1 }, status: "completed", outcome: "failure" }]);
   assert.deepEqual(failed.map((step) => step.status), ["done", "ready", "locked"]);
   assert.equal(failed[0].outcome, "failure");
   assert.equal(failed[0].projectId, "gen-aaaaaaaaaaaa");
@@ -105,4 +105,18 @@ test("without a field, the plan and the project take it from the learner", async
   await generateProject({ domain: "", topic: "", subject: "statistics", learner: "a nurse" }, { id: "gen-8", call, models: ["fake"] });
   assert.match(prompts[0], /Field: \(none given: the learner's own field/);
   assert.match(prompts[1], /Domain: \(none given: the learner's own field\)/);
+});
+
+test("an outdated prerequisite locks later steps even when they already have completed runs", () => {
+  const projects = [
+    { path_step: 1, id: "gen-firstproject", content_revision: 2 },
+    { path_step: 2, id: "gen-nextproject", content_revision: 1 },
+  ];
+  const sessions = projects.map((project) => ({
+    course_id: `project:${project.id}`, status: "completed", outcome: "success",
+    activity_snapshot: { project: project.id, version: 1, contentRevision: 1 },
+  }));
+  const progress = stepStatuses(3, projects, sessions);
+  assert.deepEqual(progress.map((step) => step.status), ["playing", "locked", "locked"]);
+  assert.ok(progress.every((step) => step.outcome === null));
 });
