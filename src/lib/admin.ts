@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { HttpError, recordDb, redactSecrets, serverDb } from "@/lib/supabase/server";
 
 /*
@@ -55,33 +56,63 @@ export type AdminUser = {
   classesTaught: number;
 };
 
+const PAGE_SIZE = 500;
+
+function readFailure(message: string, error?: { message: string } | null): never {
+  if (error) console.error("Admin read failed", { message: redactSecrets(error.message) });
+  throw new HttpError(503, message);
+}
+
+/** Stable ordering is supplied by each query, including a unique tie-breaker. */
+async function readPages<T>(
+  query: (start: number, end: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  message: string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let start = 0; ; start += PAGE_SIZE) {
+    const { data, error } = await query(start, start + PAGE_SIZE - 1);
+    if (error || !data) readFailure(message, error);
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) return rows;
+  }
+}
+
+function counts(ids: string[]) {
+  const result = new Map<string, number>();
+  for (const id of ids) result.set(id, (result.get(id) ?? 0) + 1);
+  return result;
+}
+
 export async function listUsers(): Promise<AdminUser[]> {
   const service = recordDb();
-  const [{ data: list, error }, { data: profiles }, { data: runs }, { data: classes }] = await Promise.all([
-    service.auth.admin.listUsers({ perPage: 500 }),
-    service.from("profiles").select("id,role"),
-    service.from("simulation_sessions").select("user_id").like("course_id", "project:%"),
-    service.from("classes").select("owner_id"),
-  ]);
-  if (error) {
-    console.error("listUsers failed", { message: redactSecrets(error.message) });
-    throw new HttpError(503, "Could not load the accounts. Please retry.");
+  const message = "Could not load the accounts. Please retry.";
+  async function accounts() {
+    const users: User[] = [];
+    for (let page = 1; ; page++) {
+      const { data, error } = await service.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
+      if (error || !data?.users) readFailure(message, error);
+      users.push(...data.users);
+      if (data.users.length < PAGE_SIZE) return users;
+    }
   }
-  const count = (rows: { [key: string]: unknown }[] | null, key: string, id: string) => (rows ?? []).filter((row) => row[key] === id).length;
-  return list.users
-    .map((user) => {
-      const profile = (profiles ?? []).find((row) => row.id === user.id);
-      return {
-        id: user.id,
-        email: user.email ?? null,
-        role: (profile?.role as string | undefined) ?? "student",
-        createdAt: user.created_at,
-        lastSignIn: user.last_sign_in_at ?? null,
-        runs: count(runs, "user_id", user.id),
-        classesTaught: count(classes, "owner_id", user.id),
-      };
-    })
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const [users, profiles, runs, classes] = await Promise.all([
+    accounts(),
+    readPages<{ id: string; role: string }>((start, end) => service.from("profiles").select("id,role").order("id").range(start, end), message),
+    readPages<{ user_id: string }>((start, end) => service.from("simulation_sessions").select("user_id").like("course_id", "project:%").order("id").range(start, end), message),
+    readPages<{ owner_id: string }>((start, end) => service.from("classes").select("owner_id").order("id").range(start, end), message),
+  ]);
+  const roles = new Map(profiles.map((row) => [row.id, row.role]));
+  const runCounts = counts(runs.map((row) => row.user_id));
+  const classCounts = counts(classes.map((row) => row.owner_id));
+  return users.map((user) => ({
+    id: user.id,
+    email: user.email ?? null,
+    role: roles.get(user.id) ?? "student",
+    createdAt: user.created_at,
+    lastSignIn: user.last_sign_in_at ?? null,
+    runs: runCounts.get(user.id) ?? 0,
+    classesTaught: classCounts.get(user.id) ?? 0,
+  })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** Sets a student's or instructor's role. The caller is an admin (requireAdmin). */
@@ -111,22 +142,31 @@ export async function overview(): Promise<Overview> {
   const service = recordDb();
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const head = { count: "exact" as const, head: true };
-  const [profiles, classes, runs, completed, successful, generated, usage] = await Promise.all([
-    service.from("profiles").select("role"),
-    service.from("classes").select("id", head),
-    service.from("simulation_sessions").select("id", head).like("course_id", "project:%"),
-    service.from("simulation_sessions").select("id", head).like("course_id", "project:%").eq("status", "completed"),
-    service.from("simulation_sessions").select("id", head).like("course_id", "project:%").eq("outcome", "success"),
-    service.from("generated_projects").select("id", head),
-    service.from("ai_usage").select("bucket,hits").gte("window_start", since),
+  const message = "Could not load the overview. Please retry.";
+  async function exactCount(query: PromiseLike<{ count: number | null; error: { message: string } | null }>) {
+    const { count, error } = await query;
+    if (error || count === null) readFailure(message, error);
+    return count;
+  }
+  const [total, instructors, admins, classes, runs, completed, successful, generated, usage] = await Promise.all([
+    exactCount(service.from("profiles").select("id", head)),
+    exactCount(service.from("profiles").select("id", head).eq("role", "instructor")),
+    exactCount(service.from("profiles").select("id", head).eq("role", "admin")),
+    exactCount(service.from("classes").select("id", head)),
+    exactCount(service.from("simulation_sessions").select("id", head).like("course_id", "project:%")),
+    exactCount(service.from("simulation_sessions").select("id", head).like("course_id", "project:%").eq("status", "completed")),
+    exactCount(service.from("simulation_sessions").select("id", head).like("course_id", "project:%").eq("outcome", "success")),
+    exactCount(service.from("generated_projects").select("id", head)),
+    readPages<{ bucket: string; hits: number }>((start, end) => service.from("ai_usage")
+      .select("bucket,hits").gte("window_start", since)
+      .order("user_id").order("bucket").order("window_start").range(start, end), message),
   ]);
-  const roles = (profiles.data ?? []).map((row) => row.role as string);
-  const hits = (bucket: string) => (usage.data ?? []).filter((row) => row.bucket === bucket).reduce((sum, row) => sum + Number(row.hits), 0);
+  const hits = (bucket: string) => usage.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + Number(row.hits), 0);
   return {
-    users: { total: roles.length, instructors: roles.filter((role) => role === "instructor").length, admins: roles.filter((role) => role === "admin").length },
-    classes: classes.count ?? 0,
-    runs: { total: runs.count ?? 0, completed: completed.count ?? 0, successful: successful.count ?? 0 },
-    generatedProjects: generated.count ?? 0,
+    users: { total, instructors, admins },
+    classes,
+    runs: { total: runs, completed, successful },
+    generatedProjects: generated,
     aiLastDay: { roleplay: hits("roleplay"), feedback: hits("feedback"), generation: hits("generation") },
   };
 }
