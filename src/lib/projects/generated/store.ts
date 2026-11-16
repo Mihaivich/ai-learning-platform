@@ -36,12 +36,21 @@ export function newGeneratedId() {
 }
 
 /** True when the project is assigned to a class the user is in. */
-async function assignedToUser(id: string, userId: string) {
+async function assignedToUser(id: string, userId: string, ownerId: string) {
   const service = recordDb();
-  const { data: memberships } = await service.from("class_members").select("class_id").eq("student_id", userId);
+  const { data: memberships, error: membershipError } = await service.from("class_members").select("class_id").eq("student_id", userId);
+  if (membershipError) throw new HttpError(503, "Could not check project access. Please retry.");
   const classIds = (memberships ?? []).map((row) => row.class_id as string);
   if (!classIds.length) return false;
-  const { data } = await service.from("class_projects").select("class_id").eq("project_id", id).in("class_id", classIds).limit(1);
+  // Do not trust an assignment alone: legacy or privileged writes may link
+  // another owner's private project to a class.
+  const { data, error } = await service.from("class_projects")
+    .select("class_id,classes!inner(owner_id)")
+    .eq("project_id", id)
+    .in("class_id", classIds)
+    .eq("classes.owner_id", ownerId)
+    .limit(1);
+  if (error) throw new HttpError(503, "Could not check project access. Please retry.");
   return Boolean(data?.length);
 }
 
@@ -52,7 +61,7 @@ async function playableRow<T extends string>(id: string, userId: string, columns
   if (error) throw new HttpError(503, "Could not load this project. Please retry.");
   if (!data) return null;
   const row = data as unknown as Record<string, unknown> & { owner_id: string };
-  return row.owner_id === userId || (await assignedToUser(id, userId)) ? row : null;
+  return row.owner_id === userId || (await assignedToUser(id, userId, row.owner_id)) ? row : null;
 }
 
 /** What the desktop shows before the run loads. */
